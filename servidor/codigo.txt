@@ -1,0 +1,466 @@
+/**
+ * Cherry: calorías y macros, con los datos en una hoja de tu Google Drive.
+ *
+ * Una vez: pega este archivo en un proyecto de script.google.com, ejecuta configurar()
+ * y publícalo como aplicación web (Ejecutar como: yo · Quién tiene acceso: cualquier usuario).
+ * Al actualizar el código, vuelve a ejecutar configurar(): añade lo que falte sin tocar tus datos.
+ *
+ * La app vive en GitHub Pages (WEB) y habla con este servidor por fetch:
+ * GET ?accion=datos&k=CLAVE[&dia=yyyy-mm-dd] y POST { api: 'accion', k, que, d, dia }.
+ */
+
+const TZ = 'Europe/Madrid';
+const WEB = 'https://hidegalaxy.github.io/cherry/';
+
+// Cada entrada del registro guarda sus macros ya calculados: si luego cambias un alimento, el pasado no se mueve.
+const ESQUEMA = {
+  Registro: ['id', 'dia', 'comida', 'alimento', 'nombre', 'gramos', 'kcal', 'prot', 'carb', 'grasa', 'creado'],
+  Alimentos: ['id', 'nombre', 'kcal', 'prot', 'carb', 'grasa', 'unidad', 'gUnidad', 'ml', 'codigo', 'fuente', 'creado'],
+  Platos: ['id', 'nombre', 'items', 'creado'],
+  Peso: ['dia', 'kg'],
+  Metas: ['dia', 'kcal', 'prot', 'carb', 'grasa', 'motivo'],
+  Perfil: ['campo', 'valor'],
+};
+const COMIDAS = ['des', 'com', 'mer', 'cen'];
+const CAMPOS_PERFIL = ['sexo', 'edad', 'altura', 'actividad', 'objetivo'];
+// Días hacia atrás que se mandan a la app: pesos para la tendencia y registro para los habituales.
+const DIAS_PESO = 60;
+const DIAS_HABITUALES = 30;
+
+// Crea o completa la hoja "Cherry" y la clave. Se puede repetir sin miedo.
+function configurar() {
+  const props = PropertiesService.getScriptProperties();
+  // Una copia de otro proyecto puede traer la hoja de su dueño: si no se puede abrir, se empieza de cero.
+  if (props.getProperty('HOJA')) {
+    try {
+      SpreadsheetApp.openById(props.getProperty('HOJA'));
+    } catch (err) {
+      props.deleteProperty('HOJA');
+      props.deleteProperty('CLAVE');
+    }
+  }
+  if (!props.getProperty('HOJA')) {
+    const nuevo = SpreadsheetApp.create('Cherry');
+    nuevo.setSpreadsheetTimeZone(TZ);
+    nuevo.setSpreadsheetLocale('es_ES');
+    nuevo.getSheets()[0].setName('Registro');
+    props.setProperty('HOJA', nuevo.getId());
+  }
+  const ss = libro_();
+  Object.keys(ESQUEMA).forEach(nombre => {
+    const h = ss.getSheetByName(nombre) || ss.insertSheet(nombre);
+    const ultima = h.getLastColumn();
+    const cab = ultima ? h.getRange(1, 1, 1, ultima).getValues()[0].map(String) : [];
+    const faltan = ESQUEMA[nombre].filter(c => cab.indexOf(c) < 0);
+    if (faltan.length) h.getRange(1, cab.length + 1, 1, faltan.length).setValues([faltan]);
+    h.setFrozenRows(1);
+  });
+  if (!props.getProperty('CLAVE')) {
+    props.setProperty('CLAVE', Utilities.getUuid().replace(/-/g, '').slice(0, 16));
+  }
+  Logger.log('Hoja: ' + ss.getUrl());
+  Logger.log('Clave: ' + props.getProperty('CLAVE'));
+}
+
+// ---------- Web ----------
+
+// GET ?k=CLAVE&accion=datos[&dia=]  → datos de la app en JSON
+// GET (sin clave) o ?accion=instalar → página con el QR para abrir Cherry en el iPhone
+function doGet(e) {
+  const p = e.parameter;
+  if (p.accion === 'datos') {
+    try {
+      comprobar_(p.k);
+      return json_(datos_(diaValido_(p.dia) || hoy_()));
+    } catch (err) {
+      return json_({ error: err.message });
+    }
+  }
+  return paginaInstalar_(p.k);
+}
+
+// POST { api: 'accion', k, que, d, dia } → { msg, datos }
+function doPost(e) {
+  let d;
+  try {
+    d = JSON.parse(e.postData.contents);
+  } catch (err) {
+    return json_({ error: 'Petición mal formada' });
+  }
+  if (d.api !== 'accion') return json_({ error: 'Petición desconocida' });
+  try {
+    return json_(accion(d.k, d.que, d.d, d.dia));
+  } catch (err) {
+    return json_({ error: err.message });
+  }
+}
+
+// ---------- Instalación ----------
+
+// Lo que se ve al abrir la dirección del servidor recién publicado: pide la clave y, con ella,
+// enseña el QR para abrir Cherry en el iPhone.
+function paginaInstalar_(k) {
+  const exec = ScriptApp.getService().getUrl();
+  const ok = claveValida_(k);
+  const enlaceApp = WEB + '?api=' + idDe_(exec) + '&k=' + encodeURIComponent(k || '');
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const cuerpo = ok
+    ? '<h1>¡Tu Cherry está lista!</h1>' +
+      '<p>Escanea este código con la <b>cámara del iPhone</b> y abre el enlace en Safari.<br><i>Escaneja aquest codi amb la càmera de l\'iPhone i obre l\'enllaç a Safari.</i></p>' +
+      '<div id="qr"></div>' +
+      '<p class="peq">Luego, en Safari: <b>Compartir → Añadir a pantalla de inicio</b>.<br><i>Després, a Safari: Comparteix → Afegeix a la pantalla d\'inici.</i></p>' +
+      '<p class="peq">El enlace, por si lo quieres copiar (no lo compartas: lleva tu clave):</p><input readonly value="' + esc(enlaceApp) + '" onclick="this.select()">' +
+      '<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>' +
+      '<script>new QRCode(document.getElementById("qr"), { text: ' + JSON.stringify(enlaceApp) + ', width: 260, height: 260, colorDark: "#0d0b0c", colorLight: "#ffffff" });</script>'
+    : '<h1>Instalar Cherry</h1>' +
+      '<p>Pega la <b>clave</b> que salió en el registro al ejecutar <b>configurar</b>.<br><i>Enganxa la clau que va sortir al registre en executar configurar.</i></p>' +
+      (k ? '<p class="mal">Esa clave no es correcta. · <i>Aquesta clau no és correcta.</i></p>' : '') +
+      '<form method="get" action="' + esc(exec) + '" target="_top"><input type="hidden" name="accion" value="instalar">' +
+      '<input name="k" placeholder="Clave · Clau" autocomplete="off" required><button>Continuar</button></form>';
+  const html = '<!doctype html><html lang="es"><head><meta charset="utf-8"><style>' +
+    'body{margin:0;background:#0d0b0c;color:#f6f2f2;font:17px/1.45 system-ui,-apple-system,sans-serif;display:flex;justify-content:center}' +
+    'main{max-width:460px;padding:40px 24px;text-align:center}h1{font-size:30px;margin:18px 0 10px}' +
+    '.logo{width:84px;height:84px;border-radius:20px;background:#ff5c7a;margin:0 auto;display:flex;align-items:center;justify-content:center}' +
+    '#qr{display:inline-block;background:#fff;padding:16px;border-radius:18px;margin:14px 0}i{color:#a1979a}.peq{font-size:14px}.mal{color:#ffcf5a}' +
+    'input{width:100%;box-sizing:border-box;padding:12px 14px;border-radius:12px;border:1px solid #2e272a;background:#171415;color:#f6f2f2;font-size:15px;margin:8px 0}' +
+    'button{width:100%;padding:14px;border:0;border-radius:14px;background:#ff5c7a;color:#0d0b0c;font-weight:700;font-size:17px;cursor:pointer}' +
+    '</style></head><body><main><div class="logo">' + LOGO_SVG_ + '</div>' + cuerpo + '</main></body></html>';
+  return HtmlService.createHtmlOutput(html).setTitle('Instalar Cherry')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+const LOGO_SVG_ = '<svg width="54" height="54" viewBox="0 0 24 24" fill="none" stroke="#0d0b0c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c-1 4-3 7-5.5 9.5M12 3c1.5 3.5 3.5 6 5.5 8"/><path d="M12 3c2-1 4-.8 5.5.5"/><circle cx="6.5" cy="16.5" r="4" fill="#0d0b0c"/><circle cx="17.5" cy="15.5" r="4" fill="#0d0b0c"/></svg>';
+
+function idDe_(exec) {
+  return (String(exec || '').match(/\/s\/([\w-]+)\//) || [])[1] || '';
+}
+
+// ---------- Llamadas de la app ----------
+
+// Todas las escrituras pasan por aquí y devuelven los datos del día que se está mirando.
+function accion(k, que, d, dia) {
+  comprobar_(k);
+  if (!ACCIONES_[que]) throw new Error('Acción desconocida: ' + que);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  let msg;
+  try {
+    msg = ACCIONES_[que](d || {});
+  } finally {
+    lock.releaseLock();
+  }
+  return { msg: msg || '', datos: datos_(diaValido_(dia) || hoy_()) };
+}
+
+const ACCIONES_ = {
+  // { dia, comida, items: [{ id, alimento, nombre, gramos, kcal, prot, carb, grasa }] }
+  apuntar: d => {
+    const dia = diaValido_(d.dia);
+    if (!dia) throw new Error('Falta el día');
+    if (COMIDAS.indexOf(d.comida) < 0) throw new Error('Comida desconocida');
+    const items = [].concat(d.items || []);
+    if (!items.length) throw new Error('No hay nada que apuntar');
+    const ya = ids_('Registro');
+    items.forEach(x => {
+      const id = idValido_(x.id) || nuevoId_('r');
+      if (ya[id]) return; // reintento de algo que ya llegó
+      const g = numero_(x.gramos);
+      if (!(g > 0)) throw new Error('Cantidad no válida');
+      anadir_('Registro', {
+        id, dia, comida: d.comida, alimento: String(x.alimento || ''), nombre: limpiar_(x.nombre) || 'Alimento', gramos: redondear_(g, 0),
+        kcal: redondear_(numero_(x.kcal), 0), prot: redondear_(numero_(x.prot), 1), carb: redondear_(numero_(x.carb), 1), grasa: redondear_(numero_(x.grasa), 1),
+        creado: new Date(),
+      });
+    });
+    return items.length === 1 ? 'Apuntado' : 'Apuntados ' + items.length;
+  },
+  // { id, gramos?, comida? } → recalcula los macros en proporción a los gramos
+  editarEntrada: d => {
+    const fila = leer_('Registro').find(r => String(r.id) === d.id);
+    if (!fila) throw new Error('No encuentro esa entrada');
+    const cambios = {};
+    if (d.gramos != null) {
+      const g = numero_(d.gramos);
+      if (!(g > 0)) throw new Error('Cantidad no válida');
+      const f = g / Number(fila.gramos);
+      cambios.gramos = redondear_(g, 0);
+      cambios.kcal = redondear_(fila.kcal * f, 0);
+      ['prot', 'carb', 'grasa'].forEach(c => { cambios[c] = redondear_(fila[c] * f, 1); });
+    }
+    if (d.comida != null) {
+      if (COMIDAS.indexOf(d.comida) < 0) throw new Error('Comida desconocida');
+      cambios.comida = d.comida;
+    }
+    actualizar_('Registro', fila._fila, cambios);
+    return 'Guardado';
+  },
+  borrarEntrada: d => { borrarDonde_('Registro', r => String(r.id) === d.id); return 'Borrado'; },
+
+  // Crea o cambia un alimento propio. Un código de barras ya guardado no se repite.
+  alimento: d => {
+    const nombre = limpiar_(d.nombre);
+    if (!nombre) throw new Error('Pon un nombre');
+    const kcal = numero_(d.kcal);
+    if (!(kcal >= 0 && kcal <= 950)) throw new Error('Las kcal por 100 g van de 0 a 950');
+    const filas = leer_('Alimentos');
+    const codigo = String(d.codigo || '').replace(/\D/g, '');
+    const fila = filas.find(r => String(r.id) === d.id) || (codigo && filas.find(r => String(r.codigo).replace(/\D/g, '') === codigo));
+    const datos = {
+      nombre, kcal: redondear_(kcal, 0),
+      prot: redondear_(numero_(d.prot) || 0, 1), carb: redondear_(numero_(d.carb) || 0, 1), grasa: redondear_(numero_(d.grasa) || 0, 1),
+      unidad: limpiar_(d.unidad), gUnidad: numero_(d.gUnidad) > 0 ? redondear_(numero_(d.gUnidad), 0) : '',
+      ml: d.ml ? 1 : '', codigo: codigo ? "'" + codigo : '', fuente: ['off', 'tuyo'].indexOf(d.fuente) >= 0 ? d.fuente : 'tuyo',
+    };
+    if (fila) {
+      actualizar_('Alimentos', fila._fila, datos);
+      return 'Guardado';
+    }
+    datos.id = idValido_(d.id) || nuevoId_('a');
+    datos.creado = new Date();
+    anadir_('Alimentos', datos);
+    return 'Guardado en tus alimentos';
+  },
+  borrarAlimento: d => { borrarDonde_('Alimentos', r => String(r.id) === d.id); return 'Alimento borrado'; },
+
+  // { id?, nombre, items: [[alimento, gramos], …] }
+  plato: d => {
+    const nombre = limpiar_(d.nombre);
+    if (!nombre) throw new Error('Pon un nombre al plato');
+    const items = [].concat(d.items || []).filter(x => x && x[0] && numero_(x[1]) > 0).map(x => [String(x[0]), redondear_(numero_(x[1]), 0)]);
+    if (!items.length) throw new Error('El plato está vacío');
+    const fila = leer_('Platos').find(r => String(r.id) === d.id);
+    if (fila) {
+      actualizar_('Platos', fila._fila, { nombre, items: JSON.stringify(items) });
+      return 'Plato guardado';
+    }
+    anadir_('Platos', { id: idValido_(d.id) || nuevoId_('p'), nombre, items: JSON.stringify(items), creado: new Date() });
+    return 'Plato guardado';
+  },
+  borrarPlato: d => { borrarDonde_('Platos', r => String(r.id) === d.id); return 'Plato borrado'; },
+
+  // { dia, kg }: un peso por día; el último que apuntas manda.
+  peso: d => {
+    const dia = diaValido_(d.dia);
+    const kg = numero_(d.kg);
+    if (!dia) throw new Error('Falta el día');
+    if (!(kg > 30 && kg < 250)) throw new Error('Escribe el peso en kg, por ejemplo 72,4');
+    const fila = leer_('Peso').find(r => diaTexto_(r.dia) === dia);
+    if (fila) actualizar_('Peso', fila._fila, { kg: redondear_(kg, 1) });
+    else anadir_('Peso', { dia, kg: redondear_(kg, 1) });
+    return 'Peso guardado';
+  },
+
+  // { sexo, edad, altura, actividad, objetivo, peso, meta } desde la pantalla de tus datos.
+  perfil: d => {
+    const h = hoja_('Perfil');
+    const filas = leer_('Perfil');
+    CAMPOS_PERFIL.forEach(c => {
+      if (d[c] == null) return;
+      const fila = filas.find(r => r.campo === c);
+      if (fila) actualizar_('Perfil', fila._fila, { valor: d[c] });
+      else anadir_('Perfil', { campo: c, valor: d[c] });
+    });
+    h.setFrozenRows(1);
+    if (d.peso) ACCIONES_.peso({ dia: hoy_(), kg: d.peso });
+    if (d.meta) ACCIONES_.meta(Object.assign({ motivo: 'tus datos' }, d.meta));
+    return 'Datos guardados';
+  },
+  // { kcal, prot, carb, grasa, motivo }: cada cambio queda como una fila, así se ve la historia de ajustes.
+  meta: d => {
+    const m = { kcal: numero_(d.kcal), prot: numero_(d.prot), carb: numero_(d.carb), grasa: numero_(d.grasa) };
+    if (!(m.kcal >= 1000 && m.kcal <= 6000)) throw new Error('Las kcal del día van de 1000 a 6000');
+    if (!(m.prot >= 0 && m.carb >= 0 && m.grasa >= 0)) throw new Error('Macros no válidos');
+    const dia = hoy_();
+    const hoyYa = leer_('Metas').find(r => diaTexto_(r.dia) === dia);
+    const fila = Object.assign({ dia, motivo: limpiar_(d.motivo) || 'a mano' }, m);
+    if (hoyYa) actualizar_('Metas', hoyYa._fila, fila);
+    else anadir_('Metas', fila);
+    return 'Meta: ' + Math.round(m.kcal) + ' kcal';
+  },
+};
+
+// ---------- Datos para la app ----------
+
+function datos_(dia) {
+  const hoy = hoy_();
+  const registro = leer_('Registro').map(r => ({
+    id: String(r.id), dia: diaTexto_(r.dia), comida: String(r.comida), alimento: String(r.alimento), nombre: String(r.nombre),
+    gramos: Number(r.gramos), kcal: Number(r.kcal), prot: Number(r.prot), carb: Number(r.carb), grasa: Number(r.grasa),
+  }));
+
+  // Totales de los 7 días que acaban en el día que se mira.
+  const semana = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = diaMas_(dia, -i);
+    const es = registro.filter(r => r.dia === d);
+    semana.push({ dia: d, kcal: Math.round(es.reduce((a, r) => a + r.kcal, 0)), prot: Math.round(es.reduce((a, r) => a + r.prot, 0)), n: es.length });
+  }
+
+  // Habituales: lo que más has comido en los últimos 30 días, con la última cantidad que pusiste.
+  const desde = diaMas_(hoy, -DIAS_HABITUALES);
+  const cuenta = {};
+  registro.filter(r => r.dia >= desde && r.alimento).forEach(r => {
+    const c = cuenta[r.alimento] = cuenta[r.alimento] || { alimento: r.alimento, veces: 0, gramos: r.gramos, ultimo: '' };
+    c.veces++;
+    if (r.dia >= c.ultimo) { c.ultimo = r.dia; c.gramos = r.gramos; }
+  });
+  const habituales = Object.keys(cuenta).map(k => cuenta[k])
+    .sort((a, b) => b.veces - a.veces || (b.ultimo > a.ultimo ? 1 : -1)).slice(0, 10)
+    .map(c => ({ alimento: c.alimento, gramos: c.gramos, veces: c.veces }));
+
+  const perfil = {};
+  leer_('Perfil').forEach(r => { perfil[r.campo] = r.valor; });
+  const metas = leer_('Metas').map(r => ({ dia: diaTexto_(r.dia), kcal: Number(r.kcal), prot: Number(r.prot), carb: Number(r.carb), grasa: Number(r.grasa), motivo: String(r.motivo) }))
+    .sort((a, b) => (a.dia < b.dia ? -1 : a.dia > b.dia ? 1 : 0));
+  const desdePeso = diaMas_(hoy, -DIAS_PESO);
+  const pesos = leer_('Peso').map(r => ({ dia: diaTexto_(r.dia), kg: Number(r.kg) }))
+    .filter(p => p.dia >= desdePeso && p.kg > 0).sort((a, b) => (a.dia < b.dia ? -1 : 1));
+
+  return {
+    hoy, dia,
+    registro: registro.filter(r => r.dia === dia),
+    semana,
+    habituales,
+    alimentos: leer_('Alimentos').map(r => ({
+      id: String(r.id), nombre: String(r.nombre), kcal: Number(r.kcal), prot: Number(r.prot), carb: Number(r.carb), grasa: Number(r.grasa),
+      unidad: String(r.unidad || ''), gUnidad: Number(r.gUnidad) || 0, ml: !!r.ml, codigo: String(r.codigo || '').replace(/\D/g, ''), fuente: String(r.fuente || 'tuyo'),
+    })),
+    platos: leer_('Platos').map(r => {
+      let items = [];
+      try { items = JSON.parse(r.items); } catch (e) {}
+      return { id: String(r.id), nombre: String(r.nombre), items };
+    }),
+    pesos,
+    perfil,
+    meta: metas.length ? metas[metas.length - 1] : null,
+    metas: metas.slice(-6),
+  };
+}
+
+// ---------- Hoja ----------
+
+let LIBRO_ = null;
+
+function libro_() {
+  if (!LIBRO_) {
+    const id = PropertiesService.getScriptProperties().getProperty('HOJA');
+    if (!id) throw new Error('Falta ejecutar configurar()');
+    LIBRO_ = SpreadsheetApp.openById(id);
+  }
+  return LIBRO_;
+}
+
+function hoja_(nombre) {
+  const h = libro_().getSheetByName(nombre);
+  if (!h) throw new Error('Falta la pestaña ' + nombre + ': ejecuta configurar()');
+  return h;
+}
+
+function cabecera_(h) {
+  return h.getRange(1, 1, 1, h.getLastColumn()).getValues()[0].map(String);
+}
+
+// Filas como objetos { columna: valor, _fila }. Se saltan las que tienen vacía la primera columna.
+function leer_(nombre) {
+  const v = hoja_(nombre).getDataRange().getValues();
+  const cab = v[0].map(String);
+  const out = [];
+  for (let i = 1; i < v.length; i++) {
+    if (v[i][0] === '' || v[i][0] == null) continue;
+    const o = { _fila: i + 1 };
+    cab.forEach((c, j) => { o[c] = v[i][j]; });
+    out.push(o);
+  }
+  return out;
+}
+
+function ids_(nombre) {
+  const o = {};
+  leer_(nombre).forEach(r => { o[String(r.id)] = true; });
+  return o;
+}
+
+function anadir_(nombre, obj) {
+  const h = hoja_(nombre);
+  h.appendRow(cabecera_(h).map(c => celda_(obj[c])));
+}
+
+function actualizar_(nombre, fila, cambios) {
+  const h = hoja_(nombre);
+  const cab = cabecera_(h);
+  Object.keys(cambios).forEach(c => {
+    const j = cab.indexOf(c);
+    if (j >= 0) h.getRange(fila, j + 1).setValue(celda_(cambios[c]));
+  });
+}
+
+// Borra de abajo arriba para que los números de fila no se desplacen.
+function borrarDonde_(nombre, cumple) {
+  const h = hoja_(nombre);
+  leer_(nombre).filter(cumple).map(r => r._fila).sort((a, b) => b - a).forEach(f => h.deleteRow(f));
+}
+
+// ---------- Utilidades ----------
+
+function claveValida_(k) {
+  return !!k && k === PropertiesService.getScriptProperties().getProperty('CLAVE');
+}
+
+function comprobar_(k) {
+  if (!claveValida_(k)) throw new Error('Clave incorrecta');
+}
+
+function json_(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function numero_(x) {
+  return Number(String(x == null ? '' : x).trim().replace(',', '.'));
+}
+
+function redondear_(x, dec) {
+  const f = Math.pow(10, dec);
+  return Math.round((Number(x) || 0) * f) / f;
+}
+
+// Texto que entra en la hoja: sin espacios sobrantes y sin convertirse en fórmula ("=algo").
+// El apóstrofo inicial de los códigos de barras también vale: así no se vuelven números.
+function limpiar_(s) {
+  s = String(s == null ? '' : s).trim();
+  return /^[=+\-@]/.test(s) ? "'" + s : s;
+}
+
+function celda_(v) {
+  if (v == null) return '';
+  return typeof v === 'string' && v.charAt(0) !== "'" ? limpiar_(v) : v;
+}
+
+function nuevoId_(letra) {
+  return letra + Utilities.getUuid().slice(0, 8);
+}
+
+// Los ids los puede inventar la app (para apuntar al instante y reintentar sin duplicar).
+function idValido_(id) {
+  return /^[\w-]{4,24}$/.test(String(id || '')) ? String(id) : '';
+}
+
+// Fecha 'yyyy-mm-dd' que existe, o ''. (La hoja la convierte en fecha; diaTexto_ la vuelve a texto.)
+function diaValido_(s) {
+  const m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return '';
+  const f = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+  return f.getUTCMonth() === +m[2] - 1 ? m[0] : '';
+}
+
+function diaTexto_(v) {
+  return v instanceof Date ? Utilities.formatDate(v, TZ, 'yyyy-MM-dd') : String(v || '').slice(0, 10);
+}
+
+function hoy_() {
+  return Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd');
+}
+
+function diaMas_(dia, n) {
+  const [y, m, d] = dia.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+}

@@ -1,0 +1,1268 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cherry</title>
+<!-- Icono y pantalla completa al añadirla a la pantalla de inicio. -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cherry">
+<meta name="theme-color" content="#0d0b0c">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icono-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Familia Lima/Plum: una pantalla de móvil oscura, mucho aire, un solo color fuerte (cereza) y un color fijo por macro. */
+  :root {
+    color-scheme: dark;
+    --bg: #0d0b0c;
+    --surface: #171415;
+    --line: #251f21;
+    --track: #2e272a;
+    --text: #f6f2f2;
+    --muted: #a1979a;
+    --dim: #6e6467;
+    --cherry: #ff5c7a;
+    --ink: #0d0b0c;
+    --pro: #6fb7ff;
+    --car: #ffcf5a;
+    --fat: #5ee0b0;
+    --font: 'Space Grotesk', -apple-system, system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.4 var(--font); overscroll-behavior: none; }
+  button, input { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--cherry); outline-offset: 2px; }
+
+  .app { height: 100%; display: flex; flex-direction: column; max-width: 480px; margin: 0 auto; position: relative; overflow: hidden; padding-top: env(safe-area-inset-top, 0px); }
+  @media (min-width: 640px) {
+    body { display: flex; align-items: center; justify-content: center; padding-block: 24px; }
+    .app { height: min(900px, 100%); width: 420px; border: 1px solid var(--line); border-radius: 40px; }
+  }
+  .carga { position: absolute; top: env(safe-area-inset-top, 0px); left: 0; right: 0; height: 2px; overflow: hidden; z-index: 7; opacity: 0; transition: opacity .2s; }
+  .carga.ver { opacity: 1; }
+  .carga::after { content: ''; position: absolute; top: 0; bottom: 0; width: 35%; background: var(--cherry); animation: carga 1s ease-in-out infinite; }
+  @keyframes carga { from { left: -35%; } to { left: 100%; } }
+
+  header.cab { display: flex; align-items: center; gap: 12px; padding: 18px max(20px, env(safe-area-inset-right, 0px)) 8px max(20px, env(safe-area-inset-left, 0px)); }
+  .cab h1 { margin: 0; font-size: 30px; font-weight: 700; letter-spacing: -.03em; }
+  .cab .sub { color: var(--muted); font-size: 15px; flex: 1; padding-top: 6px; display: flex; align-items: center; gap: 2px; min-width: 0; }
+  .cab .sub button { border: 0; background: none; color: var(--muted); width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; }
+  .cab .sub button:disabled { opacity: .25; }
+  .cab .sub .volver { width: auto; padding: 0 8px; font-size: 13px; font-weight: 600; color: var(--cherry); }
+  .mas { width: 42px; height: 42px; border-radius: 14px; border: 0; background: var(--cherry); color: var(--ink); display: grid; place-items: center; flex: 0 0 42px; }
+
+  main { flex: 1; min-height: 0; overflow-y: auto; padding: 8px max(20px, env(safe-area-inset-right, 0px)) 28px max(20px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; gap: 22px; }
+  .eti { font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
+  .num { font-variant-numeric: tabular-nums; }
+  .nota { font-size: 13px; color: var(--muted); margin: 0; line-height: 1.5; }
+  .grupo { display: flex; flex-direction: column; gap: 6px; }
+
+  /* Today */
+  .hero { background: var(--cherry); color: var(--ink); border-radius: 26px; padding: 20px 22px; display: flex; flex-direction: column; gap: 8px; }
+  .hero.pasado { background: var(--car); }
+  .hero .eti { color: rgba(13,11,12,.65); }
+  .hero h2 { margin: 0; font-size: 44px; letter-spacing: -.04em; line-height: 1; font-variant-numeric: tabular-nums; }
+  .hero h2 small { font-size: 18px; letter-spacing: 0; font-weight: 600; opacity: .7; }
+  .hero p { margin: 0; font-weight: 600; opacity: .75; font-size: 14px; }
+  .pista { height: 8px; border-radius: 4px; background: rgba(13,11,12,.18); overflow: hidden; }
+  .pista em { display: block; height: 100%; border-radius: 4px; background: var(--ink); transition: width .5s ease; }
+
+  .macros { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .macro { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .macro b { font-size: 13px; font-weight: 600; color: var(--muted); }
+  .macro span { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .macro span small { color: var(--dim); font-weight: 500; }
+  .macro i { height: 6px; border-radius: 3px; background: var(--track); overflow: hidden; display: block; }
+  .macro i em { display: block; height: 100%; border-radius: 3px; transition: width .5s ease; }
+
+  .comidas { display: flex; flex-direction: column; }
+  .comida { border-top: 1px solid var(--line); padding: 12px 0 8px; display: flex; flex-direction: column; gap: 2px; }
+  .comida .fila1 { display: flex; align-items: center; gap: 10px; }
+  .comida .fila1 b { flex: 1; font-weight: 600; font-size: 17px; }
+  .comida .fila1 span { font-size: 14px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .mini { width: 34px; height: 34px; border-radius: 11px; border: 0; background: var(--track); color: var(--cherry); display: grid; place-items: center; flex: 0 0 34px; }
+  .item { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; color: var(--muted); padding: 5px 0; background: none; border: 0; width: 100%; text-align: left; }
+  .item span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .item span:last-child { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .item.nuevo { animation: entra .5s ease; color: var(--text); }
+  .vacio { font-size: 14px; color: var(--dim); padding: 2px 0; }
+  .enlace { align-self: flex-start; background: none; border: 0; padding: 4px 0; color: var(--cherry); font-size: 13px; font-weight: 600; }
+  @keyframes entra { from { opacity: 0; transform: translateY(-6px); } }
+
+  .tip { border: 1px solid var(--line); border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 12px; background: var(--surface); }
+  .tip p { margin: 0; line-height: 1.5; }
+  .tip b { color: var(--pro); font-weight: 600; }
+  .fila { display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn { height: 44px; padding: 0 18px; border-radius: 14px; border: 0; background: var(--cherry); color: var(--ink); font-weight: 700; }
+  .btn.sec { background: none; border: 1px solid var(--track); color: var(--text); font-weight: 600; }
+  .btn.peligro { background: none; border: 1px solid var(--track); color: var(--cherry); font-weight: 600; }
+  .btn.peligro.seguro { background: var(--cherry); color: var(--ink); }
+  .btn.ancho { width: 100%; height: 50px; }
+  .btn:disabled { opacity: .4; }
+
+  .rapido { display: flex; align-items: center; gap: 10px; border: 1px solid var(--track); border-radius: 18px; padding: 0 8px 0 16px; background: var(--bg); }
+  .rapido input { flex: 1; min-width: 0; height: 52px; border: 0; background: none; outline: none; font-size: 16px; }
+  .rapido input::placeholder { color: var(--dim); }
+  .rapido button { width: 38px; height: 38px; border: 0; border-radius: 12px; background: var(--track); display: grid; place-items: center; color: var(--cherry); flex: 0 0 38px; }
+
+  /* Listas de alimentos */
+  .lista { display: flex; flex-direction: column; }
+  .ali { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .ali:last-child { border-bottom: 0; }
+  .ali .txt { flex: 1; min-width: 0; background: none; border: 0; padding: 0; text-align: left; }
+  .ali .txt b { display: block; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ali .txt small { display: block; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fuente { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 3px 7px; border-radius: 6px; background: var(--track); color: var(--muted); white-space: nowrap; }
+  .fuente.off { color: var(--car); }
+  .fuente.tuyo { color: var(--cherry); }
+
+  /* Progress */
+  .tarjeta { background: var(--surface); border: 1px solid var(--line); border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+  .tarjeta .grande { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .tarjeta .grande b { font-size: 38px; font-weight: 700; letter-spacing: -.04em; line-height: 1; font-variant-numeric: tabular-nums; }
+  .chip { font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: rgba(94,224,176,.14); color: var(--fat); white-space: nowrap; }
+  .chip.aviso { background: rgba(255,207,90,.14); color: var(--car); }
+  .chip.gris { background: var(--track); color: var(--muted); }
+  .tarjeta p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+  .tarjeta p b { color: var(--text); font-weight: 600; }
+  svg.graf { width: 100%; height: auto; display: block; }
+  svg.graf text { fill: var(--dim); font: 500 10px var(--font); }
+  .linea2 { display: flex; gap: 8px; }
+  .linea2 .campo { flex: 1; min-width: 0; }
+  .objetivos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .objetivos div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .objetivos b { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .objetivos span { font-size: 12px; color: var(--muted); }
+
+  nav { display: flex; border-top: 1px solid var(--line); padding: 4px max(8px, env(safe-area-inset-right, 0px)) max(8px, env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px)); }
+  nav button { flex: 1; border: 0; background: none; color: var(--dim); display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 0 4px; font-size: 11px; font-weight: 600; }
+  nav button[aria-current] { color: var(--cherry); }
+
+  /* Hojas */
+  .velo { position: absolute; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: flex-end; z-index: 5; }
+  .hoja { width: 100%; background: var(--surface); border-radius: 28px 28px 0 0; border-top: 1px solid var(--track); padding: 20px max(20px, env(safe-area-inset-right, 0px)) max(24px, env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; gap: 14px; max-height: 92%; overflow-y: auto; }
+  .hoja.alta { height: 92%; }
+  .hoja h3 { margin: 0; font-size: 22px; letter-spacing: -.02em; overflow-wrap: anywhere; }
+  .hoja .por { color: var(--muted); font-size: 13px; margin-top: -8px; font-variant-numeric: tabular-nums; }
+  .campo { width: 100%; height: 48px; border: 1px solid var(--track); background: var(--bg); border-radius: 14px; padding: 0 14px; outline: none; font-size: 16px; }
+  .campo:focus { border-color: var(--muted); }
+  label.camp { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  label.camp span { font-size: 12px; color: var(--muted); font-weight: 600; }
+  .rejilla { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .rejilla.cuatro { grid-template-columns: repeat(4, 1fr); }
+  .rejilla .campo { padding: 0 10px; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chips button { min-height: 38px; padding: 4px 14px; border-radius: 12px; border: 1px solid var(--track); background: none; font-weight: 600; font-size: 14px; }
+  .chips button small { display: block; font-weight: 500; font-size: 11px; opacity: .7; }
+  .chips button[aria-pressed="true"] { background: var(--text); color: var(--ink); border-color: var(--text); }
+  .paso { display: flex; align-items: center; gap: 10px; }
+  .paso button { width: 52px; height: 52px; border-radius: 16px; border: 1px solid var(--track); background: none; font-size: 24px; font-weight: 500; flex: 0 0 52px; }
+  .paso label { flex: 1; display: flex; align-items: baseline; justify-content: center; gap: 6px; height: 52px; border-radius: 16px; background: var(--bg); border: 1px solid var(--track); padding-top: 8px; min-width: 0; }
+  .paso input { width: 50%; border: 0; background: none; outline: none; text-align: right; font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .paso label span { color: var(--muted); font-weight: 600; width: 50%; }
+  .total { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 14px 16px; border-radius: 16px; background: var(--bg); }
+  .total b { font-size: 30px; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .total b small { font-size: 15px; color: var(--muted); letter-spacing: 0; }
+  .total span { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .p { color: var(--pro); } .c { color: var(--car); } .g { color: var(--fat); }
+  #lector { width: 100%; border-radius: 20px; overflow: hidden; background: #000; min-height: 220px; }
+  #lector video { width: 100% !important; display: block; }
+
+  /* Bienvenida */
+  .bienvenida h2 { margin: 0; font-size: 26px; letter-spacing: -.03em; text-wrap: balance; }
+  .bienvenida p { margin: 0; color: var(--muted); line-height: 1.5; }
+  .resumen { border-radius: 18px; background: var(--surface); border: 1px solid var(--line); padding: 16px; display: flex; flex-direction: column; gap: 6px; }
+  .resumen b { font-size: 26px; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+
+  .toast { position: absolute; left: 16px; right: 16px; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); background: var(--text); color: var(--ink); padding: 12px 16px; border-radius: 14px; font-weight: 600; font-size: 14px; opacity: 0; transform: translateY(8px); transition: .25s; pointer-events: none; z-index: 8; display: flex; justify-content: space-between; gap: 10px; }
+  .toast.ver { opacity: 1; transform: none; pointer-events: auto; }
+  .toast button { background: none; border: 0; padding: 0; color: var(--ink); font-weight: 700; text-decoration: underline; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="carga" id="carga"></div>
+  <header class="cab"><h1 id="titulo">Cherry</h1><div class="sub" id="sub"></div>
+    <button class="mas" id="mas" aria-label="Añadir" hidden></button></header>
+  <main id="vista"><p class="nota">Cargando…</p></main>
+  <nav id="nav" hidden></nav>
+  <div class="velo" id="velo" hidden></div>
+  <div class="toast" id="toast" role="status"><span id="toastTxt"></span><button id="deshacer" hidden>Deshacer</button></div>
+</div>
+
+<!-- Lector de códigos de barras (solo se usa al pulsar el escáner). -->
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" defer></script>
+
+<script>
+// <calculos>
+// Metas y ajustes. Funciones puras: las prueba pruebas/test.js.
+const ACTIVIDAD = { poco: 1.375, medio: 1.55, mucho: 1.725 };
+// kcal sobre el mantenimiento, proteína en g por kg y ritmo de peso buscado en kg por semana.
+const OBJETIVO = {
+  ganar: { nombre: 'Ganar músculo', kcal: 250, prot: 1.8, ritmo: [0.1, 0.3] },
+  mantener: { nombre: 'Mantener', kcal: 0, prot: 1.6, ritmo: [-0.15, 0.15] },
+  perder: { nombre: 'Perder grasa', kcal: -400, prot: 2.0, ritmo: [-0.7, -0.25] },
+};
+const PASO_AJUSTE = 150;
+const DIAS_ENTRE_AJUSTES = 14;
+
+// Mifflin-St Jeor × actividad; grasa al 25 % de las kcal y el resto en carbohidratos.
+function calcularMeta(p) {
+  const peso = +p.peso, altura = +p.altura, edad = +p.edad;
+  const bmr = 10 * peso + 6.25 * altura - 5 * edad + (p.sexo === 'm' ? -161 : 5);
+  const mant = bmr * (ACTIVIDAD[p.actividad] || ACTIVIDAD.medio);
+  const o = OBJETIVO[p.objetivo] || OBJETIVO.ganar;
+  const kcal = Math.round((mant + o.kcal) / 50) * 50;
+  const prot = Math.round(peso * o.prot / 5) * 5;
+  const grasa = Math.round(kcal * 0.25 / 9 / 5) * 5;
+  const carb = Math.max(0, Math.round((kcal - prot * 4 - grasa * 9) / 4 / 5) * 5);
+  return { kcal, prot, carb, grasa, mant: Math.round(mant / 10) * 10 };
+}
+
+function diasEntre(a, b) {
+  const t = s => Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10));
+  return Math.round((t(b) - t(a)) / 86400000);
+}
+function diaMas(dia, n) {
+  const [y, m, d] = dia.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+}
+const promedio = a => a.reduce((s, x) => s + x, 0) / a.length;
+
+// Cada pesada con la media de las pesadas de sus últimos 7 días.
+function mediaMovil(pesos) {
+  return pesos.map(p => ({ ...p, media: promedio(pesos.filter(q => q.dia <= p.dia && diasEntre(q.dia, p.dia) < 7).map(q => q.kg)) }));
+}
+
+// kg por semana: media de los últimos 7 días contra la de hace 2 semanas (la misma cuenta que el ajuste);
+// si aún no hay pesadas de hace 2 semanas, contra la semana anterior. Hacen falta 2 pesadas en cada tramo.
+function ritmoSemanal(pesos, hoy) {
+  const tramo = (a, b) => pesos.filter(p => { const d = diasEntre(p.dia, hoy); return d >= a && d < b; }).map(p => p.kg);
+  const ahora = tramo(0, 7), hace2 = tramo(14, 21), hace1 = tramo(7, 14);
+  if (ahora.length < 2) return null;
+  if (hace2.length >= 2) return (promedio(ahora) - promedio(hace2)) / 2;
+  if (hace1.length >= 2) return promedio(ahora) - promedio(hace1);
+  return null;
+}
+
+// Cada 2 semanas desde el último cambio de meta: compara la media de esta semana con la de hace 2 semanas.
+function revisarAjuste(pesos, meta, objetivo, hoy) {
+  if (!meta) return { estado: 'sin-meta' };
+  const desde = diasEntre(meta.dia, hoy);
+  if (desde < DIAS_ENTRE_AJUSTES) return { estado: 'pronto', proxima: diaMas(meta.dia, DIAS_ENTRE_AJUSTES) };
+  const tramo = (a, b) => pesos.filter(p => { const d = diasEntre(p.dia, hoy); return d >= a && d < b; }).map(p => p.kg);
+  const ahora = tramo(0, 7), antes = tramo(14, 21);
+  if (ahora.length < 3 || antes.length < 3) return { estado: 'faltan', ahora: ahora.length, antes: antes.length };
+  const ritmo = (promedio(ahora) - promedio(antes)) / 2;
+  const [min, max] = (OBJETIVO[objetivo] || OBJETIVO.ganar).ritmo;
+  const cambio = ritmo < min ? PASO_AJUSTE : ritmo > max ? -PASO_AJUSTE : 0;
+  if (!cambio) return { estado: 'ok', ritmo, min, max };
+  return {
+    estado: cambio > 0 ? 'subir' : 'bajar', ritmo, min, max, cambio,
+    nueva: { kcal: meta.kcal + cambio, prot: meta.prot, carb: Math.max(0, meta.carb + Math.round(cambio / 4)), grasa: meta.grasa },
+  };
+}
+// </calculos>
+</script>
+<script>
+  // Servidor de Google con el que habla la app. Cada persona tiene el suyo:
+  // llega como ?api=ID&k=CLAVE la primera vez (QR de la instalación) y se recuerda.
+  const API = leerGuardado('api', v => /^[\w-]{20,}$/.test(v));
+  const K = leerGuardado('k', v => v.length >= 6);
+  const URL_API = API ? 'https://script.google.com/macros/s/' + API + '/exec' : '';
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const n0 = x => Math.round(x).toLocaleString('es-ES');
+  const n1 = x => (Math.round(x * 10) / 10).toLocaleString('es-ES', { maximumFractionDigits: 1 });
+  const sinAcentos = s => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const nid = l => l + Date.now().toString(36).slice(-5) + Math.random().toString(36).slice(2, 6);
+
+  const COMIDAS = [['des', 'Desayuno'], ['com', 'Comida'], ['mer', 'Merienda'], ['cen', 'Cena']];
+  const nombreComida = id => (COMIDAS.find(c => c[0] === id) || COMIDAS[3])[1];
+  const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+  const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  const fecha = dia => { const f = new Date(dia + 'T12:00:00'); return DIAS[f.getDay()].slice(0, 3) + ' ' + f.getDate() + ' ' + MESES[f.getMonth()]; };
+  const hoyLocal = () => new Date().toLocaleDateString('sv-SE');
+
+  const ICONOS = {
+    today: '<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 9 9h-9z" fill="currentColor" stroke="none"/>',
+    foods: '<path d="M4 6h16M4 12h16M4 18h10"/>',
+    progress: '<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>',
+    mas: '<path d="M12 5v14M5 12h14"/>',
+    codigo: '<path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 8v8M10 8v8M13 8v8M17 8v8"/>',
+    izq: '<path d="M15 6l-6 6 6 6"/>',
+    der: '<path d="M9 6l6 6-6 6"/>',
+  };
+  const ico = (n, s = 20, w = 2) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONOS[n]}</svg>`;
+  const TABS = [['today', 'Today'], ['foods', 'Foods'], ['progress', 'Progress']];
+
+  // Tabla de alimentos frescos y básicos, por 100 g (valores medios aproximados).
+  // [nombre, kcal, proteína, carbohidratos, grasa, unidad, gramos de una unidad, es líquido (ml)]
+  const BASE = {
+    arroz: ['Arroz blanco (crudo)', 354, 7, 78, 0.6],
+    arrozCocido: ['Arroz blanco (cocido)', 130, 2.7, 28, 0.3],
+    arrozInt: ['Arroz integral (crudo)', 350, 7.5, 73, 2.7],
+    pasta: ['Pasta (cruda)', 358, 12.5, 72, 1.5],
+    pastaCocida: ['Pasta (cocida)', 158, 5.8, 31, 0.9],
+    avena: ['Copos de avena', 372, 13.5, 58.7, 7],
+    panBarra: ['Pan blanco de barra', 265, 8.5, 52, 1.6, 'trozo', 40],
+    panMolde: ['Pan de molde blanco', 265, 8, 49, 3.5, 'rebanada', 25],
+    panInt: ['Pan de molde integral', 247, 10, 41, 3.4, 'rebanada', 30],
+    wrap: ['Tortilla de trigo (wrap)', 310, 8.5, 52, 7.5, 'wrap', 60],
+    quinoa: ['Quinoa (cruda)', 368, 14, 64, 6],
+    cuscus: ['Cuscús (crudo)', 376, 12.8, 77, 0.6],
+    patata: ['Patata', 77, 2, 17, 0.1, 'patata', 200],
+    boniato: ['Boniato', 86, 1.6, 20, 0.1],
+    cereales: ['Copos de maíz (cereales)', 378, 7, 84, 0.9],
+    tortitas: ['Tortitas de arroz', 387, 8, 81, 2.8, 'tortita', 8],
+    maria: ['Galletas María', 436, 7, 74, 12, 'galleta', 6],
+    croissant: ['Cruasán', 406, 8, 46, 21, 'cruasán', 60],
+    lentejas: ['Lentejas (crudas)', 352, 24.6, 63, 1.1],
+    lentejasBote: ['Lentejas cocidas (bote)', 100, 7.5, 14, 0.5],
+    garbanzos: ['Garbanzos cocidos (bote)', 130, 7.5, 17, 2.5],
+    alubias: ['Alubias cocidas (bote)', 95, 6.5, 13, 0.5],
+    tofu: ['Tofu firme', 144, 15.5, 2.8, 8.7],
+    sojaText: ['Soja texturizada', 330, 50, 30, 1],
+    pollo: ['Pechuga de pollo', 113, 23, 0, 1.9],
+    muslo: ['Muslo de pollo sin piel', 125, 19, 0, 5],
+    pavo: ['Pechuga de pavo', 105, 24, 0, 1],
+    pavoLonchas: ['Pavo en lonchas', 100, 19, 2, 1.8, 'loncha', 15],
+    ternera: ['Ternera magra (filete)', 131, 21, 0, 5],
+    picada: ['Carne picada de ternera', 180, 20, 0, 11],
+    hamburguesa: ['Hamburguesa de ternera', 230, 17, 3, 17, 'hamburguesa', 110],
+    lomo: ['Lomo de cerdo', 143, 21, 0, 6.5],
+    serrano: ['Jamón serrano', 241, 31, 0, 13, 'loncha', 15],
+    york: ['Jamón cocido', 110, 18, 1.5, 3.5, 'loncha', 15],
+    chorizo: ['Chorizo', 455, 24, 2, 39],
+    salmon: ['Salmón', 208, 20, 0, 13],
+    merluza: ['Merluza', 80, 17, 0, 1.3],
+    atun: ['Atún al natural (lata)', 108, 25, 0, 1, 'lata', 52],
+    atunAceite: ['Atún en aceite (escurrido)', 190, 26, 0, 9.5, 'lata', 52],
+    sardinas: ['Sardinas en aceite (escurridas)', 208, 24.6, 0, 11.5, 'lata', 85],
+    gambas: ['Gambas o langostinos', 85, 20, 0, 0.5],
+    huevo: ['Huevo', 143, 12.6, 0.7, 9.5, 'huevo', 55],
+    clara: ['Clara de huevo', 52, 10.9, 0.7, 0.2],
+    lecheEnt: ['Leche entera', 63, 3.1, 4.7, 3.5, 'vaso', 250, 1],
+    leche: ['Leche semidesnatada', 46, 3.2, 4.7, 1.6, 'vaso', 250, 1],
+    lecheDesn: ['Leche desnatada', 35, 3.4, 4.9, 0.1, 'vaso', 250, 1],
+    bebAvena: ['Bebida de avena', 45, 0.8, 7, 1.4, 'vaso', 250, 1],
+    bebSoja: ['Bebida de soja', 40, 3.3, 2.5, 1.9, 'vaso', 250, 1],
+    yogur: ['Yogur natural', 61, 3.5, 4.7, 3.3, 'yogur', 125],
+    griego: ['Yogur griego natural', 120, 3.6, 4, 10, 'yogur', 125],
+    skyr: ['Skyr natural', 63, 11, 4, 0.2, 'tarrina', 150],
+    batido0: ['Queso fresco batido 0 %', 46, 8, 3.6, 0.1],
+    burgos: ['Queso fresco de Burgos', 175, 12.5, 4, 12],
+    curado: ['Queso curado', 400, 26, 0.5, 33, 'loncha', 15],
+    mozzarella: ['Mozzarella', 250, 18, 2, 19, 'bola', 125],
+    requeson: ['Requesón', 100, 11, 3.5, 4.5],
+    platano: ['Plátano', 94, 1.2, 20, 0.3, 'plátano', 120],
+    manzana: ['Manzana', 52, 0.3, 14, 0.2, 'manzana', 180],
+    naranja: ['Naranja', 47, 0.9, 12, 0.1, 'naranja', 200],
+    mandarina: ['Mandarina', 53, 0.8, 13, 0.3, 'mandarina', 80],
+    pera: ['Pera', 57, 0.4, 15, 0.1, 'pera', 170],
+    fresas: ['Fresas', 32, 0.7, 7.7, 0.3],
+    uvas: ['Uvas', 69, 0.7, 18, 0.2],
+    kiwi: ['Kiwi', 61, 1.1, 15, 0.5, 'kiwi', 75],
+    arandanos: ['Arándanos', 57, 0.7, 14, 0.3],
+    sandia: ['Sandía', 30, 0.6, 7.6, 0.2],
+    melon: ['Melón', 34, 0.8, 8, 0.2],
+    pina: ['Piña', 50, 0.5, 13, 0.1],
+    melocoton: ['Melocotón', 39, 0.9, 10, 0.3, 'melocotón', 150],
+    datiles: ['Dátiles', 282, 2.5, 75, 0.4, 'dátil', 8],
+    pasas: ['Pasas', 299, 3, 79, 0.5],
+    tomate: ['Tomate', 18, 0.9, 3.9, 0.2, 'tomate', 120],
+    lechuga: ['Lechuga', 15, 1.4, 2.9, 0.2],
+    espinacas: ['Espinacas', 23, 2.9, 3.6, 0.4],
+    brocoli: ['Brócoli', 34, 2.8, 7, 0.4],
+    zanahoria: ['Zanahoria', 41, 0.9, 10, 0.2, 'zanahoria', 70],
+    cebolla: ['Cebolla', 40, 1.1, 9, 0.1, 'cebolla', 110],
+    pimiento: ['Pimiento', 26, 1, 6, 0.3, 'pimiento', 150],
+    calabacin: ['Calabacín', 17, 1.2, 3.1, 0.3, 'calabacín', 200],
+    champis: ['Champiñones', 22, 3.1, 3.3, 0.3],
+    pepino: ['Pepino', 15, 0.7, 3.6, 0.1],
+    judias: ['Judías verdes', 31, 1.8, 7, 0.2],
+    aguacate: ['Aguacate', 160, 2, 8.5, 14.7, 'aguacate', 150],
+    maiz: ['Maíz dulce (lata)', 80, 2.5, 15, 1.2],
+    aceite: ['Aceite de oliva', 899, 0, 0, 99.9, 'cucharada', 10],
+    mantequilla: ['Mantequilla', 740, 0.7, 0.6, 82, 'cucharadita', 5],
+    cacahuete: ['Crema de cacahuete', 600, 25, 15, 49, 'cucharada', 16],
+    almendras: ['Almendras', 579, 21, 22, 50, 'puñado', 25],
+    nueces: ['Nueces', 654, 15, 14, 65, 'puñado', 25],
+    cacahuetes: ['Cacahuetes', 567, 26, 16, 49, 'puñado', 25],
+    anacardos: ['Anacardos', 553, 18, 30, 44, 'puñado', 25],
+    aceitunas: ['Aceitunas', 145, 1, 4, 15, 'aceituna', 4],
+    chocolate: ['Chocolate negro 70 %', 598, 7.8, 46, 43, 'onza', 10],
+    whey: ['Proteína whey (polvo)', 380, 75, 8, 5, 'cacito', 30],
+    miel: ['Miel', 304, 0.3, 82, 0, 'cucharada', 20],
+    azucar: ['Azúcar', 400, 0, 100, 0, 'cucharadita', 5],
+    mermelada: ['Mermelada', 250, 0.4, 60, 0.1, 'cucharada', 20],
+    tomateFrito: ['Tomate frito', 80, 1.6, 11, 3.4],
+    patatasBolsa: ['Patatas fritas de bolsa', 536, 6, 53, 34],
+    zumo: ['Zumo de naranja', 45, 0.7, 10, 0.2, 'vaso', 200, 1],
+    cola: ['Refresco de cola', 42, 0, 10.6, 0, 'lata', 330, 1],
+    cerveza: ['Cerveza', 43, 0.5, 3.6, 0, 'caña', 200, 1],
+  };
+
+  // ---------- Estado ----------
+
+  let D = null;           // datos del servidor (más lo apuntado que aún no ha llegado)
+  let vista = 'today';
+  let hoja = null;        // lo que enseña la hoja de abajo
+  let cola = [];          // escrituras pendientes, en orden
+  let ocupado = false;
+  let deshacer = null;    // lo que hace el botón «Deshacer» del aviso
+  try { vista = localStorage.getItem('cherry.vista') || 'today'; } catch (e) {}
+  if (!TABS.some(t => t[0] === vista)) vista = 'today';
+  try { cola = JSON.parse(localStorage.getItem('cherry.cola') || '[]'); } catch (e) {}
+
+  function leerGuardado(nombre, valido) {
+    const q = new URLSearchParams(location.search).get(nombre) || '';
+    if (q && valido(q)) {
+      try { localStorage.setItem('cherry.' + nombre, q); } catch (e) {}
+      return q;
+    }
+    try { return localStorage.getItem('cherry.' + nombre) || ''; } catch (e) { return ''; }
+  }
+
+  // ---------- Servidor ----------
+
+  // text/plain evita la comprobación previa del navegador, que el servidor de Google no contesta.
+  async function llamar(que, d) {
+    let r;
+    try {
+      r = que === 'datos'
+        ? await fetch(URL_API + '?accion=datos&k=' + encodeURIComponent(K) + '&dia=' + encodeURIComponent(d || ''))
+        : await fetch(URL_API, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ api: 'accion', k: K, que, d, dia: D && D.dia }) });
+    } catch (e) {
+      const err = new Error('Sin conexión');
+      err.red = true;
+      throw err;
+    }
+    let j;
+    try { j = await r.json(); } catch (e) { const err = new Error('El servidor no ha contestado bien'); err.red = true; throw err; }
+    if (j && j.error) throw new Error(j.error);
+    return j;
+  }
+
+  async function cargar(dia) {
+    cargando(true);
+    try {
+      const r = await llamar('datos', dia || '');
+      // Si aún hay cosas por subir, mandan ellas: al terminar la cola llegan los datos buenos.
+      if (!cola.length || !D || r.dia !== D.dia) { D = r; guardarCache(); pintar(); }
+    } catch (e) {
+      if (/clave/i.test(e.message)) pantallaClave(e.message);
+      else if (!D) $('vista').innerHTML = `<div class="tarjeta"><p><b>No se han podido cargar tus datos.</b> ${esc(e.message)}.</p><button class="btn sec" data-act="recargar">Probar otra vez</button></div>`;
+      else avisar(e.red ? 'Sin conexión: enseño lo último que tenía' : 'Error: ' + e.message);
+    }
+    cargando(false);
+  }
+
+  // Escribe: primero en pantalla (al instante) y luego en la hoja, de una en una y en orden.
+  function enviar(que, d) {
+    local(que, d);
+    cola.push({ que, d });
+    guardarCola();
+    guardarCache();
+    pintar();
+    vaciar();
+  }
+  async function vaciar() {
+    if (ocupado || !cola.length) return;
+    ocupado = true;
+    cargando(true);
+    while (cola.length) {
+      try {
+        const r = await llamar(cola[0].que, cola[0].d);
+        cola.shift();
+        guardarCola();
+        if (!cola.length && r.datos && (!D || r.datos.dia === D.dia)) { D = r.datos; guardarCache(); repintar(); }
+      } catch (e) {
+        if (e.red) { avisar('Sin conexión: se guardará al volver la red'); break; }
+        cola.shift();
+        guardarCola();
+        avisar('No se ha guardado: ' + e.message);
+        if (!cola.length) { ocupado = false; cargando(false); return cargar(D && D.dia); }
+      }
+    }
+    ocupado = false;
+    cargando(false);
+  }
+  addEventListener('online', vaciar);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible' || !D) return;
+    if (cola.length) return vaciar();
+    // Al volver otro día, Today pasa al día nuevo.
+    if (D.hoy !== hoyLocal() && D.dia === D.hoy) cargar(hoyLocal());
+  });
+
+  // Lo mismo que hará el servidor, aplicado ya en pantalla.
+  function local(que, d) {
+    if (!D) return;
+    const upsert = (lista, obj) => { const i = lista.findIndex(x => x.id === obj.id); if (i >= 0) lista[i] = { ...lista[i], ...obj }; else lista.push(obj); };
+    if (que === 'apuntar' && d.dia === D.dia) d.items.forEach(x => D.registro.push({ ...x, dia: d.dia, comida: d.comida, nuevo: true }));
+    if (que === 'editarEntrada') {
+      const e = D.registro.find(x => x.id === d.id);
+      if (e && d.gramos) { const f = d.gramos / e.gramos; ['kcal', 'prot', 'carb', 'grasa'].forEach(c => { e[c] *= f; }); e.gramos = d.gramos; }
+      if (e && d.comida) e.comida = d.comida;
+    }
+    if (que === 'borrarEntrada') D.registro = D.registro.filter(x => x.id !== d.id);
+    if (que === 'alimento') upsert(D.alimentos, d);
+    if (que === 'borrarAlimento') D.alimentos = D.alimentos.filter(x => x.id !== d.id);
+    if (que === 'plato') upsert(D.platos, d);
+    if (que === 'borrarPlato') D.platos = D.platos.filter(x => x.id !== d.id);
+    if (que === 'peso' || (que === 'perfil' && d.peso)) {
+      const dia = d.dia || D.hoy;
+      D.pesos = D.pesos.filter(p => p.dia !== dia).concat({ dia, kg: +d.kg || +d.peso }).sort((a, b) => (a.dia < b.dia ? -1 : 1));
+    }
+    if (que === 'perfil') {
+      ['sexo', 'edad', 'altura', 'actividad', 'objetivo'].forEach(c => { if (d[c] != null) D.perfil[c] = d[c]; });
+      if (d.meta) D.meta = { ...d.meta, dia: D.hoy, motivo: 'tus datos' };
+    }
+    if (que === 'meta') D.meta = { ...d, dia: D.hoy };
+  }
+
+  function guardarCache() {
+    if (!D || D.dia !== D.hoy) return;
+    try { localStorage.setItem('cherry.cache', JSON.stringify(D)); } catch (e) {}
+  }
+  function leerCache() {
+    try { return JSON.parse(localStorage.getItem('cherry.cache') || 'null'); } catch (e) { return null; }
+  }
+  function guardarCola() {
+    try { localStorage.setItem('cherry.cola', JSON.stringify(cola)); } catch (e) {}
+  }
+  function cargando(si) { $('carga').classList.toggle('ver', si); }
+
+  // ---------- Alimentos ----------
+
+  // Un alimento de la tabla (id «b:…») o de los tuyos, siempre con la misma forma.
+  function alimento(id) {
+    if (!id) return null;
+    if (id.startsWith('b:')) {
+      const b = BASE[id.slice(2)];
+      return b ? { id, nombre: b[0], kcal: b[1], prot: b[2], carb: b[3], grasa: b[4], unidad: b[5] || '', gUnidad: b[6] || 0, ml: !!b[7], fuente: 'base' } : null;
+    }
+    return D.alimentos.find(a => a.id === id) || null;
+  }
+  const macros = (a, g) => ({ kcal: a.kcal * g / 100, prot: a.prot * g / 100, carb: a.carb * g / 100, grasa: a.grasa * g / 100 });
+  const suma = lista => lista.reduce((t, x) => ({ kcal: t.kcal + x.kcal, prot: t.prot + x.prot, carb: t.carb + x.carb, grasa: t.grasa + x.grasa }), { kcal: 0, prot: 0, carb: 0, grasa: 0 });
+  const plural = (u, n) => n === 1 ? u : /ón$/.test(u) ? u.replace(/ón$/, 'ones') : u + (/[aeiouáéíóú]$/.test(u) ? 's' : 'es');
+  // «2 huevos», «1 vaso» o «150 g».
+  function cant(a, g) {
+    const u = a && a.gUnidad;
+    if (u) {
+      const n = g / u;
+      if (n >= 0.5 && Math.abs(n * 2 - Math.round(n * 2)) < 0.02) {
+        const r = Math.round(n * 2) / 2;
+        return (r === 0.5 ? 'media' : n1(r)) + ' ' + (r === 0.5 ? a.unidad : plural(a.unidad, r));
+      }
+    }
+    return n0(g) + (a && a.ml ? ' ml' : ' g');
+  }
+  // Entrada del registro con sus macros ya calculados (se guardan así en la hoja).
+  function entrada(a, g) {
+    const m = macros(a, g);
+    return { id: nid('r'), alimento: a.id, nombre: a.nombre, gramos: Math.round(g), kcal: Math.round(m.kcal), prot: +m.prot.toFixed(1), carb: +m.carb.toFixed(1), grasa: +m.grasa.toFixed(1) };
+  }
+  const resumenMacros = m => `<span class="p">P ${n1(m.prot)}</span> · <span class="c">C ${n1(m.carb)}</span> · <span class="g">G ${n1(m.grasa)}</span>`;
+
+  function buscarLocal(q) {
+    q = sinAcentos(q.trim());
+    if (!q) return [];
+    const palabras = q.split(/\s+/);
+    const vale = n => { const s = sinAcentos(n); return palabras.every(p => s.includes(p)); };
+    const mios = D.alimentos.filter(a => vale(a.nombre));
+    const tabla = Object.keys(BASE).map(k => alimento('b:' + k)).filter(a => vale(a.nombre));
+    return [...mios, ...tabla].slice(0, 30);
+  }
+
+  // Open Food Facts: base libre de productos envasados, con sus valores por 100 g.
+  function deOFF(p, codigo) {
+    const n = p.nutriments || {};
+    let kcal = n['energy-kcal_100g'];
+    if (kcal == null && n.energy_100g != null) kcal = n.energy_100g / 4.184;
+    if (kcal == null || isNaN(kcal)) return null;
+    const marca = String(p.brands || '').split(',')[0].trim();
+    const nombre = String(p.product_name_es || p.product_name || 'Producto sin nombre').trim();
+    const racion = Number(p.serving_quantity);
+    const r1 = x => Math.round((Number(x) || 0) * 10) / 10;
+    return {
+      nombre: (nombre + (marca && !sinAcentos(nombre).includes(sinAcentos(marca)) ? ' · ' + marca : '')).slice(0, 80),
+      kcal: Math.round(kcal), prot: r1(n.proteins_100g), carb: r1(n.carbohydrates_100g), grasa: r1(n.fat_100g),
+      unidad: racion > 0 && racion < 1000 ? 'ración' : '', gUnidad: racion > 0 && racion < 1000 ? Math.round(racion) : 0,
+      ml: false, codigo: String(codigo || p.code || '').replace(/\D/g, ''), fuente: 'off',
+    };
+  }
+  const CAMPOS_OFF = 'code,product_name,product_name_es,brands,nutriments,serving_quantity';
+  async function offCodigo(codigo) {
+    const r = await fetch('https://world.openfoodfacts.org/api/v2/product/' + codigo + '.json?fields=' + CAMPOS_OFF);
+    if (r.status === 404) return null;
+    const j = await r.json();
+    return j.status === 1 && j.product ? deOFF(j.product, codigo) : null;
+  }
+  async function offBuscar(q) {
+    const r = await fetch('https://es.openfoodfacts.org/cgi/search.pl?search_simple=1&action=process&json=1&page_size=25&fields=' + CAMPOS_OFF + '&search_terms=' + encodeURIComponent(q));
+    const j = await r.json();
+    return (j.products || []).map(p => deOFF(p)).filter(Boolean);
+  }
+  // Guarda un producto de Open Food Facts en tus alimentos (o reutiliza el que ya tenías con ese código).
+  function guardarDeOFF(p) {
+    const ya = p.codigo && D.alimentos.find(a => a.codigo === p.codigo);
+    if (ya) return ya;
+    const a = { ...p, id: nid('a') };
+    enviar('alimento', a);
+    return a;
+  }
+
+  // ---------- Pintar ----------
+
+  function pintar() {
+    if (!D) return;
+    const sinMeta = !D.meta;
+    $('nav').hidden = sinMeta;
+    $('mas').hidden = sinMeta;
+    if (sinMeta) {
+      $('titulo').textContent = 'Cherry';
+      $('sub').innerHTML = '';
+      $('vista').innerHTML = bienvenida();
+      prepararPerfil();
+      return;
+    }
+    $('titulo').textContent = TABS.find(t => t[0] === vista)[1];
+    $('sub').innerHTML = subtitulo();
+    $('vista').innerHTML = VISTAS[vista]();
+    $('nav').innerHTML = TABS.map(([id, t]) => `<button data-tab="${id}" ${id === vista ? 'aria-current="page"' : ''}>${ico(id, 22)}${t}</button>`).join('');
+    D.registro.forEach(x => delete x.nuevo);
+  }
+  // Tras una respuesta del servidor: repinta sin perder el scroll ni lo que se está escribiendo en una hoja.
+  function repintar() {
+    const top = $('vista').scrollTop;
+    const enFoco = document.activeElement && $('vista').contains(document.activeElement) ? document.activeElement.id : '';
+    if (enFoco) return;
+    pintar();
+    $('vista').scrollTop = top;
+  }
+
+  function subtitulo() {
+    if (vista === 'today') {
+      const esHoy = D.dia === D.hoy;
+      return `<button data-act="dia" data-n="-1" aria-label="Día anterior">${ico('izq', 18)}</button><span class="num">${esHoy ? 'hoy, ' : ''}${fecha(D.dia)}</span>
+        <button data-act="dia" data-n="1" aria-label="Día siguiente" ${esHoy ? 'disabled' : ''}>${ico('der', 18)}</button>${esHoy ? '' : '<button class="volver" data-act="dia" data-n="0">Volver a hoy</button>'}`;
+    }
+    if (vista === 'foods') return `<span>${D.alimentos.length} tuyos · ${D.platos.length} ${D.platos.length === 1 ? 'plato' : 'platos'}</span>`;
+    return `<span>${esc((OBJETIVO[D.perfil.objetivo] || OBJETIVO.ganar).nombre.toLowerCase())}</span>`;
+  }
+
+  const VISTAS = {
+    today() {
+      const t = suma(D.registro);
+      const M = D.meta;
+      const queda = M.kcal - t.kcal;
+      const esHoy = D.dia === D.hoy;
+      const sig = COMIDAS.find(([id]) => !D.registro.some(x => x.comida === id));
+      const barras = [['Proteína', t.prot, M.prot, 'var(--pro)'], ['Carbos', t.carb, M.carb, 'var(--car)'], ['Grasa', t.grasa, M.grasa, 'var(--fat)']];
+      return `<section class="hero ${esHoy ? '' : 'pasado'}"><span class="eti">${queda >= 0 ? (esHoy ? 'Te quedan' : 'Quedaron') : (esHoy ? 'Te has pasado' : 'Te pasaste')}</span>
+          <h2>${n0(Math.abs(queda))} <small>kcal</small></h2>
+          <div class="pista"><em style="width:${Math.min(100, t.kcal / M.kcal * 100)}%"></em></div>
+          <p>${n0(t.kcal)} de ${n0(M.kcal)}${esHoy && sig && D.registro.length ? ' · falta la ' + sig[1].toLowerCase() : ''}</p></section>
+        <div class="macros">${barras.map(([n, v, m, c]) => `<div class="macro"><b>${n}</b><span>${n0(v)} <small>/ ${n0(m)} g</small></span><i><em style="width:${Math.min(100, v / m * 100)}%;background:${c}"></em></i></div>`).join('')}</div>
+        ${tipHtml(t)}
+        <div class="comidas">${COMIDAS.map(([id, nombre]) => {
+          const it = D.registro.filter(x => x.comida === id);
+          const s = suma(it);
+          return `<section class="comida"><div class="fila1"><b>${nombre}</b><span>${it.length ? n0(s.kcal) + ' kcal' : ''}</span>
+              <button class="mini" data-act="abrir" data-m="${id}" aria-label="Añadir a ${nombre.toLowerCase()}">${ico('mas', 16, 2.6)}</button></div>
+            ${it.length ? it.map(x => `<button class="item ${x.nuevo ? 'nuevo' : ''}" data-act="entrada" data-id="${esc(x.id)}"><span>${esc(x.nombre)} · ${cant(alimento(x.alimento), x.gramos)}</span><span>${n0(x.kcal)}</span></button>`).join('')
+              : `<span class="vacio">${esHoy ? 'Nada todavía' : 'Nada apuntado'}</span>`}
+            ${it.length >= 2 ? `<button class="enlace" data-act="guardarPlato" data-m="${id}">Guardar como plato</button>` : ''}
+          </section>`;
+        }).join('')}</div>`;
+    },
+    foods() {
+      const platos = D.platos.map(p => {
+        const s = suma(p.items.map(([id, g]) => { const a = alimento(id); return a ? macros(a, g) : { kcal: 0, prot: 0, carb: 0, grasa: 0 }; }));
+        return `<div class="ali"><button class="txt" data-act="verPlato" data-id="${esc(p.id)}"><b>${esc(p.nombre)}</b><small>${p.items.map(([id, g]) => { const a = alimento(id); return a ? esc(a.nombre.replace(/ \(.*\)$/, '').toLowerCase()) + ' ' + cant(a, g) : ''; }).filter(Boolean).join(' · ')}</small></button><span class="num">${n0(s.kcal)}</span></div>`;
+      }).join('');
+      const mios = D.alimentos.slice().sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+      return `<div class="rapido"><input id="filtro" placeholder="Buscar en tus alimentos" aria-label="Buscar en tus alimentos" autocomplete="off"><button data-act="escanear" aria-label="Escanear código de barras">${ico('codigo', 18)}</button></div>
+        <div class="grupo"><span class="eti">Mis platos</span>
+          ${platos ? `<div class="lista">${platos}</div>` : '<p class="nota">Cuando una comida tenga dos o más cosas, pulsa «Guardar como plato» en Today y aquí podrás apuntarla entera con un toque.</p>'}</div>
+        <div class="grupo"><span class="eti">Mis alimentos · por 100 g</span>
+          ${mios.length ? `<div class="lista" id="listaFoods">${mios.map(a => `<div class="ali" data-nombre="${esc(sinAcentos(a.nombre))}"><button class="txt" data-act="editarAlimento" data-id="${esc(a.id)}"><b>${esc(a.nombre)}</b><small>${n0(a.kcal)} kcal · P ${n1(a.prot)} · C ${n1(a.carb)} · G ${n1(a.grasa)}</small></button><span class="fuente ${a.fuente}">${a.fuente === 'off' ? 'Código' : 'Tuyo'}</span></div>`).join('')}</div>`
+            : '<p class="nota">Aquí se guardan los productos que escanees y los que crees a mano.</p>'}</div>
+        <button class="btn ancho sec" data-act="nuevoAlimento">+ Alimento a mano</button>
+        <p class="nota">Además, al buscar salen ${Object.keys(BASE).length} alimentos frescos y básicos de la tabla incluida (valores medios). Para lo envasado, mejor el código de barras: trae los valores de la etiqueta desde Open Food Facts.</p>`;
+    },
+    progress() {
+      const conMedia = mediaMovil(D.pesos);
+      const ultima = conMedia[conMedia.length - 1];
+      const ritmo = ritmoSemanal(D.pesos, D.hoy);
+      const obj = OBJETIVO[D.perfil.objetivo] || OBJETIVO.ganar;
+      const enRitmo = ritmo != null && ritmo >= obj.ritmo[0] && ritmo <= obj.ritmo[1];
+      const pesoHoy = D.pesos.find(p => p.dia === D.hoy);
+      const aj = revisarAjuste(D.pesos, D.meta, D.perfil.objetivo, D.hoy);
+      const semana = D.semana.map(s => s.dia === D.dia ? { ...s, kcal: suma(D.registro).kcal, prot: suma(D.registro).prot, n: D.registro.length } : s);
+      const pasados = semana.filter(s => s.dia !== D.hoy && s.n);
+      const mediaK = pasados.length ? promedio(pasados.map(s => s.kcal)) : 0;
+      const cumplidos = pasados.filter(s => s.prot >= D.meta.prot).length;
+      let ajuste;
+      if (aj.estado === 'pronto') ajuste = `<p>Tu meta es del ${fecha(D.meta.dia)}. La reviso el <b>${fecha(aj.proxima)}</b> con la media de tu peso. Buscamos ${n1(obj.ritmo[0])} a ${n1(obj.ritmo[1])} kg por semana; si te sales, te propongo subir o bajar ${PASO_AJUSTE} kcal.</p>`;
+      else if (aj.estado === 'faltan') ajuste = `<p>Ya toca revisar la meta, pero me faltan pesadas: necesito 3 de esta semana (llevas ${aj.ahora}) y 3 de hace dos semanas (hay ${aj.antes}). Pésate en ayunas unas mañanas.</p>`;
+      else if (aj.estado === 'ok') ajuste = `<p>Vas a <b>${n1(aj.ritmo)} kg por semana</b>, dentro de lo que buscamos (${n1(aj.min)} a ${n1(aj.max)}). Mantengo ${n0(D.meta.kcal)} kcal.</p><div class="fila"><button class="btn sec" data-act="mantenerMeta">Vale, revisar en 2 semanas</button></div>`;
+      else ajuste = `<p>Vas a <b>${n1(aj.ritmo)} kg por semana</b> y buscamos de ${n1(aj.min)} a ${n1(aj.max)}. Te propongo <b>${aj.cambio > 0 ? '+' : '−'}${Math.abs(aj.cambio)} kcal</b>: ${n0(aj.nueva.kcal)} al día, todo en carbohidratos.</p>
+          <div class="fila"><button class="btn" data-act="aplicarAjuste">Pasar a ${n0(aj.nueva.kcal)} kcal</button><button class="btn sec" data-act="mantenerMeta">Dejarlo igual</button></div>`;
+      return `<section class="tarjeta"><span class="eti">Peso · media de 7 días</span>
+          ${ultima ? `<div class="grande"><b>${n1(ultima.media)} kg</b>${ritmo != null ? `<span class="chip ${enRitmo ? '' : 'aviso'}">${ritmo >= 0 ? '+' : '−'}${n1(Math.abs(ritmo))} kg/sem${enRitmo ? ' · en ritmo' : ''}</span>` : '<span class="chip gris">ritmo: faltan pesadas</span>'}</div>` : ''}
+          ${graficaPeso(conMedia)}
+          <form class="linea2" data-form="peso"><input class="campo" id="peso" inputmode="decimal" autocomplete="off" placeholder="${pesoHoy ? 'Hoy: ' + n1(pesoHoy.kg) + ' kg' : 'Peso de hoy (kg)'}" aria-label="Peso de hoy en kg"><button class="btn">Guardar</button></form>
+          <p>Pésate por la mañana, en ayunas. Mira la media, no el día: el peso diario baila hasta 1 kg por agua y sal.</p></section>
+        <section class="tarjeta"><span class="eti">Últimos 7 días</span>
+          ${barrasSemana(semana)}
+          <p>${pasados.length ? `Media <b>${n0(mediaK)} kcal</b>${D.dia === D.hoy ? ' sin contar hoy' : ''} · proteína cumplida <b>${cumplidos} de ${pasados.length} días</b>. ` : ''}La línea es tu meta de ${n0(D.meta.kcal)} y el punto azul, la proteína cumplida.</p></section>
+        <section class="tarjeta"><span class="eti">Ajuste cada 2 semanas</span>${ajuste}</section>
+        <section class="tarjeta"><span class="eti">Tu meta diaria</span>
+          <div class="objetivos">${[[n0(D.meta.kcal), 'kcal'], [n0(D.meta.prot) + ' g', 'proteína'], [n0(D.meta.carb) + ' g', 'carbos'], [n0(D.meta.grasa) + ' g', 'grasa']].map(([v, t]) => `<div><b>${v}</b><span>${t}</span></div>`).join('')}</div>
+          <div class="fila"><button class="btn sec" data-act="perfil">Cambiar mis datos</button><button class="btn sec" data-act="metaMano">Meta a mano</button></div></section>`;
+    },
+  };
+
+  // Sugerencia de proteína con tus habituales (solo hoy y si falta bastante).
+  function sugerencia(t) {
+    if (D.dia !== D.hoy) return null;
+    const falta = D.meta.prot - t.prot;
+    if (falta < 20) return null;
+    const cand = D.habituales.map(h => ({ a: alimento(h.alimento), g: h.gramos })).filter(x => x.a)
+      .map(x => ({ ...x, m: macros(x.a, x.g) })).filter(x => x.m.prot >= 8 && x.m.prot * 4 / Math.max(1, x.m.kcal) >= 0.3)
+      .sort((a, b) => b.m.prot - a.m.prot);
+    const elegidos = [];
+    let p = 0;
+    for (const c of cand) {
+      if (elegidos.length === 2 || p >= falta * 0.8) break;
+      if (p + c.m.prot <= falta + 10) { elegidos.push(c); p += c.m.prot; }
+    }
+    if (!elegidos.length) return null;
+    const sig = COMIDAS.find(([id]) => !D.registro.some(x => x.comida === id)) || COMIDAS[3];
+    return { falta, items: elegidos, m: suma(elegidos.map(x => x.m)), comida: sig[0] };
+  }
+  function tipHtml(t) {
+    const s = sugerencia(t);
+    if (!s) return '';
+    return `<section class="tip"><span class="eti">Para la ${nombreComida(s.comida).toLowerCase()}</span>
+      <p>Te faltan <b>${n0(s.falta)} g de proteína</b>. Con tus habituales: ${esc(s.items.map(x => describir(x.a, x.g)).join(' y '))} suman ${n0(s.m.prot)} g y ${n0(s.m.kcal)} kcal.</p>
+      <div class="fila"><button class="btn" data-act="tip">Añadir a la ${nombreComida(s.comida).toLowerCase()}</button><button class="btn sec" data-act="abrir" data-m="${s.comida}">Elegir otra cosa</button></div></section>`;
+  }
+
+  function graficaPeso(pesos) {
+    const W = 340, H = 150, L = 32, B = 20;
+    const d0 = diaMas(D.hoy, -27);
+    const ps = pesos.filter(p => p.dia >= d0);
+    if (ps.length < 2) return `<p>${ps.length ? 'Ya tienes la primera pesada. ' : ''}Apunta tu peso unas cuantas mañanas y aquí verás la tendencia de las últimas 4 semanas.</p>`;
+    const vals = ps.flatMap(p => [p.kg, p.media]);
+    let lo = Math.floor((Math.min(...vals) - 0.2) * 2) / 2, hi = Math.ceil((Math.max(...vals) + 0.2) * 2) / 2;
+    if (hi - lo < 1) hi = lo + 1;
+    const paso = hi - lo > 3 ? 1 : 0.5;
+    const x = dia => L + diasEntre(d0, dia) * (W - L - 8) / 27;
+    const y = v => 8 + (hi - v) / (hi - lo) * (H - B - 8);
+    const linea = ps.map((p, i) => `${i ? 'L' : 'M'}${x(p.dia).toFixed(1)},${y(p.media).toFixed(1)}`).join('');
+    const marcas = [];
+    for (let v = lo; v <= hi + 1e-9; v += paso) marcas.push(v);
+    const ult = ps[ps.length - 1];
+    return `<svg class="graf" viewBox="0 0 ${W} ${H}" role="img" aria-label="Peso de las últimas 4 semanas">
+      ${marcas.map(v => `<line x1="${L}" x2="${W}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="0" y="${y(v) + 3}">${n1(v)}</text>`).join('')}
+      ${ps.map(p => `<circle cx="${x(p.dia)}" cy="${y(p.kg)}" r="2.6" fill="var(--dim)"/>`).join('')}
+      <path d="${linea} L${x(ult.dia)},${H - B} L${x(ps[0].dia)},${H - B} Z" fill="var(--cherry)" opacity=".08"/>
+      <path d="${linea}" fill="none" stroke="var(--cherry)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="${x(ult.dia)}" cy="${y(ult.media)}" r="5" fill="var(--cherry)" stroke="var(--surface)" stroke-width="2"/>
+      ${[[d0, 'start'], [diaMas(D.hoy, -14), 'middle'], [D.hoy, 'end']].map(([d, a]) => `<text x="${x(d)}" y="${H - 4}" text-anchor="${a}">${fecha(d).slice(4)}</text>`).join('')}
+    </svg>`;
+  }
+
+  function barrasSemana(semana) {
+    const W = 340, H = 130, B = 34, bw = 30, gap = (W - 7 * bw) / 6;
+    const max = Math.max(D.meta.kcal * 1.15, ...semana.map(s => s.kcal));
+    const y = k => 6 + (1 - k / max) * (H - B - 6);
+    const letra = d => 'DLMXJVS'[new Date(d + 'T12:00:00').getDay()];
+    return `<svg class="graf" viewBox="0 0 ${W} ${H}" role="img" aria-label="Calorías de los últimos 7 días">
+      ${semana.map((s, i) => { const bx = i * (bw + gap); const hoy = s.dia === D.hoy; return `
+        ${s.n ? `<rect x="${bx}" y="${y(s.kcal)}" width="${bw}" height="${Math.max(0, H - B - y(s.kcal))}" rx="7" fill="var(--cherry)" opacity="${hoy ? .4 : .85}"/>` : `<rect x="${bx}" y="${H - B - 3}" width="${bw}" height="3" rx="1.5" fill="var(--track)"/>`}
+        <circle cx="${bx + bw / 2}" cy="${H - 24}" r="4" fill="${s.n && s.prot >= D.meta.prot ? 'var(--pro)' : 'none'}" stroke="${s.n ? 'var(--pro)' : 'var(--track)'}" stroke-width="1.5"/>
+        <text x="${bx + bw / 2}" y="${H - 5}" text-anchor="middle" style="${hoy ? 'fill:var(--text)' : ''}">${letra(s.dia)}</text>`; }).join('')}
+      <line x1="0" x2="${W}" y1="${y(D.meta.kcal)}" y2="${y(D.meta.kcal)}" stroke="var(--text)" stroke-dasharray="4 4" opacity=".5"/>
+    </svg>`;
+  }
+
+  // ---------- Tus datos (primera vez y «Cambiar mis datos») ----------
+
+  let perfilForm = {};
+  function formPerfil(boton) {
+    const p = perfilForm;
+    const chips = (campo, ops) => `<div class="chips" role="group">${ops.map(([v, t, s]) => `<button type="button" data-act="perfilChip" data-campo="${campo}" data-v="${v}" aria-pressed="${p[campo] === v}">${t}${s ? `<small>${s}</small>` : ''}</button>`).join('')}</div>`;
+    return `<form class="grupo" data-form="perfil" style="gap:14px">
+      <span class="eti">Objetivo</span>${chips('objetivo', [['ganar', 'Ganar músculo'], ['mantener', 'Mantener'], ['perder', 'Perder grasa']])}
+      <span class="eti">Sexo (para la fórmula)</span>${chips('sexo', [['h', 'Hombre'], ['m', 'Mujer']])}
+      <div class="rejilla">
+        <label class="camp"><span>Peso (kg)</span><input class="campo" id="pfPeso" inputmode="decimal" value="${esc(p.peso || '')}" autocomplete="off"></label>
+        <label class="camp"><span>Altura (cm)</span><input class="campo" id="pfAltura" inputmode="numeric" value="${esc(p.altura || '')}" autocomplete="off"></label>
+        <label class="camp"><span>Edad</span><input class="campo" id="pfEdad" inputmode="numeric" value="${esc(p.edad || '')}" autocomplete="off"></label>
+      </div>
+      <span class="eti">Actividad</span>${chips('actividad', [['poco', 'Poca', '0–2 entrenos'], ['medio', 'Media', '3–5 entrenos'], ['mucho', 'Mucha', '6–7 o trabajo físico']])}
+      <div class="resumen" id="pfResumen"></div>
+      <button class="btn ancho" id="pfGuardar">${boton}</button>
+    </form>`;
+  }
+  function leerPerfil() {
+    const num = id => parseFloat(String($(id).value).replace(',', '.'));
+    Object.assign(perfilForm, { peso: num('pfPeso'), altura: num('pfAltura'), edad: num('pfEdad') });
+    const p = perfilForm;
+    const ok = p.peso > 30 && p.peso < 250 && p.altura > 120 && p.altura < 230 && p.edad >= 14 && p.edad < 100 && p.sexo;
+    return ok ? calcularMeta(p) : null;
+  }
+  function pintarResumenPerfil() {
+    const m = leerPerfil();
+    $('pfGuardar').disabled = !m;
+    $('pfResumen').innerHTML = m
+      ? `<span class="eti">Tu meta diaria</span><b>${n0(m.kcal)} kcal</b><span class="num">${resumenMacros({ prot: m.prot, carb: m.carb, grasa: m.grasa })} (g)</span>
+         <p class="nota">Gastas unas ${n0(m.mant)} kcal al día. ${perfilForm.objetivo === 'ganar' ? 'Comes 250 más para ganar músculo sin coger mucha grasa' : perfilForm.objetivo === 'perder' ? 'Comes 400 menos para perder grasa sin perder músculo' : 'Comes lo mismo que gastas'}, con ${(OBJETIVO[perfilForm.objetivo] || OBJETIVO.ganar).prot} g de proteína por kg. Cada 2 semanas lo ajusto con tu peso real.</p>`
+      : '<p class="nota">Rellena tu peso, altura, edad y sexo para calcular tu meta.</p>';
+  }
+  function prepararPerfil() {
+    if ($('pfResumen')) pintarResumenPerfil();
+  }
+  function bienvenida() {
+    if (!perfilForm.objetivo) perfilForm = { objetivo: 'ganar', actividad: 'medio', ...D.perfil, peso: (D.pesos[D.pesos.length - 1] || {}).kg || '' };
+    return `<section class="bienvenida grupo" style="gap:10px"><h2>Calculemos lo que necesitas comer</h2>
+      <p>Con tu peso, altura, edad y actividad saco tu meta de calorías y macros. Luego la ajusto cada 2 semanas según cómo cambie tu peso.</p></section>
+      ${formPerfil('Empezar')}`;
+  }
+
+  // ---------- Hojas ----------
+
+  function abrirHoja(h) {
+    hoja = h;
+    pintarHoja();
+  }
+  function cerrarHoja() {
+    pararLector();
+    hoja = null;
+    $('velo').hidden = true;
+    $('velo').innerHTML = '';
+  }
+  const chipsComida = m => `<div class="chips">${COMIDAS.map(([id, n]) => `<button type="button" data-act="comida" data-m="${id}" aria-pressed="${id === m}">${n}</button>`).join('')}</div>`;
+
+  function pintarHoja() {
+    const H = hoja;
+    let html = '';
+    if (H.modo === 'lista') {
+      html = `<div class="hoja alta"><h3>Añadir a la ${nombreComida(H.m).toLowerCase()}</h3>${chipsComida(H.m)}
+        <form class="rapido" data-form="buscar"><input id="buscar" type="search" enterkeyhint="search" placeholder="Busca: «pollo», «skyr», «avena»…" aria-label="Buscar alimento" value="${esc(H.busca || '')}" autocomplete="off"><button type="button" data-act="escanear" aria-label="Escanear código de barras">${ico('codigo', 18)}</button></form>
+        <div id="resultados" class="grupo" style="gap:16px">${resultados()}</div></div>`;
+    } else if (H.modo === 'racion') {
+      const a = H.a, m = macros(a, H.g || 0);
+      const raciones = [...(a.gUnidad ? [[a.gUnidad, '1 ' + a.unidad], [a.gUnidad * 2, '2 ' + plural(a.unidad, 2)]] : []), [100, '100'], [150, '150'], [200, '200']]
+        .filter((r, i, arr) => arr.findIndex(z => z[0] === r[0]) === i)
+        .map(([g, t]) => [g, /^\d+$/.test(t) ? t + (a.ml ? ' ml' : ' g') : t]);
+      html = `<form class="hoja" data-form="racion">
+        <h3>${esc(a.nombre)}</h3><span class="por">Por 100 ${a.ml ? 'ml' : 'g'}: ${n0(a.kcal)} kcal · P ${n1(a.prot)} · C ${n1(a.carb)} · G ${n1(a.grasa)}${a.fuente === 'off' ? ' · Open Food Facts' : a.fuente === 'base' ? ' · tabla' : ''}</span>
+        <div class="paso"><button type="button" data-act="menos" aria-label="Menos">−</button>
+          <label><input id="gramos" inputmode="decimal" value="${H.g || ''}" aria-label="Cantidad" autocomplete="off"><span>${a.ml ? 'ml' : 'g'}</span></label>
+          <button type="button" data-act="masG" aria-label="Más">+</button></div>
+        <div class="chips">${raciones.map(([g, t]) => `<button type="button" data-act="racion" data-g="${g}" aria-pressed="${g === H.g}">${esc(t)}</button>`).join('')}</div>
+        <div class="total" id="total">${totalHtml(m)}</div>
+        <span class="eti">¿En qué comida?</span>${chipsComida(H.m)}
+        <div class="fila"><button class="btn" style="flex:1">${H.entrada ? 'Guardar' : 'Añadir a la ' + nombreComida(H.m).toLowerCase()}</button><button type="button" class="btn sec" data-act="${H.entrada ? 'cerrar' : 'volver'}">${H.entrada ? 'Cancelar' : 'Volver'}</button></div>
+        ${H.entrada ? `<button type="button" class="btn peligro" data-act="borrarEntrada">Quitar de la ${nombreComida(H.m).toLowerCase()}</button>` : ''}
+      </form>`;
+    } else if (H.modo === 'scan') {
+      html = `<div class="hoja"><h3>Escanear</h3>
+        <div id="lector"></div>
+        <p class="nota" id="scanNota">Apunta al código de barras del envase. La primera vez, el móvil te pedirá permiso para la cámara.</p>
+        <form class="linea2" data-form="codigo"><input class="campo" id="codigoMano" inputmode="numeric" placeholder="O escribe el número del código" autocomplete="off" aria-label="Número del código de barras"><button class="btn">Buscar</button></form>
+        <button class="btn sec ancho" data-act="volver">Cancelar</button></div>`;
+    } else if (H.modo === 'alimento') {
+      const a = H.a || {};
+      const v = x => x == null || x === '' ? '' : esc(String(x).replace('.', ','));
+      html = `<form class="hoja" data-form="alimento"><h3>${a.id ? 'Editar alimento' : 'Alimento a mano'}</h3>
+        <input class="campo" id="alNombre" placeholder="Nombre (p. ej. Barrita de proteína)" value="${esc(a.nombre || '')}" aria-label="Nombre" autocomplete="off">
+        <span class="eti">Por 100 g, copiado de la etiqueta</span>
+        <div class="rejilla cuatro">${[['alK', 'kcal', a.kcal], ['alP', 'proteína', a.prot], ['alC', 'carbos', a.carb], ['alG', 'grasa', a.grasa]].map(([id, t, x]) => `<label class="camp"><input class="campo" id="${id}" inputmode="decimal" value="${v(x)}" autocomplete="off"><span>${t}</span></label>`).join('')}</div>
+        <div class="rejilla" style="grid-template-columns:1fr 1fr">
+          <label class="camp"><span>Unidad (opcional)</span><input class="campo" id="alU" placeholder="barrita" value="${esc(a.unidad || '')}" autocomplete="off"></label>
+          <label class="camp"><span>Gramos de una unidad</span><input class="campo" id="alGU" inputmode="numeric" placeholder="45" value="${a.gUnidad || ''}" autocomplete="off"></label></div>
+        <p class="nota">Con la unidad podrás apuntar «1 barrita» sin pesarla.${a.codigo ? ' Código: ' + esc(a.codigo) + '.' : ''}</p>
+        <div class="fila"><button class="btn" style="flex:1">Guardar</button><button type="button" class="btn sec" data-act="cerrar">Cancelar</button></div>
+        ${a.id ? '<button type="button" class="btn peligro" data-act="borrarAlimento">Borrar alimento</button>' : ''}</form>`;
+    } else if (H.modo === 'plato') {
+      const p = H.p;
+      html = `<form class="hoja" data-form="plato"><h3>${p.id && D.platos.some(x => x.id === p.id) ? 'Editar plato' : 'Guardar como plato'}</h3>
+        <input class="campo" id="plNombre" value="${esc(p.nombre)}" aria-label="Nombre del plato" autocomplete="off">
+        <div class="lista">${p.items.map(([id, g]) => { const a = alimento(id); return a ? `<div class="ali"><div class="txt"><b>${esc(a.nombre)}</b><small>${cant(a, g)} · ${n0(macros(a, g).kcal)} kcal</small></div></div>` : ''; }).join('')}</div>
+        <div class="total">${totalHtml(suma(p.items.map(([id, g]) => { const a = alimento(id); return a ? macros(a, g) : { kcal: 0, prot: 0, carb: 0, grasa: 0 }; })))}</div>
+        <div class="fila"><button class="btn" style="flex:1">Guardar</button><button type="button" class="btn sec" data-act="cerrar">Cancelar</button></div>
+        ${D.platos.some(x => x.id === p.id) ? '<button type="button" class="btn peligro" data-act="borrarPlato">Borrar plato</button>' : ''}</form>`;
+    } else if (H.modo === 'perfil') {
+      html = `<div class="hoja alta"><h3>Tus datos</h3>${formPerfil('Guardar y recalcular')}<button class="btn sec ancho" data-act="cerrar">Cancelar</button></div>`;
+    } else if (H.modo === 'metaMano') {
+      const m = D.meta;
+      html = `<form class="hoja" data-form="metaMano"><h3>Meta a mano</h3>
+        <p class="nota">Si tu nutricionista o tu plan te dan otros números, ponlos aquí. Las kcal se recalculan solas con los macros.</p>
+        <div class="rejilla">${[['mmP', 'proteína (g)', m.prot], ['mmC', 'carbos (g)', m.carb], ['mmG', 'grasa (g)', m.grasa]].map(([id, t, x]) => `<label class="camp"><span>${t}</span><input class="campo" id="${id}" inputmode="numeric" value="${Math.round(x)}" autocomplete="off"></label>`).join('')}</div>
+        <div class="total" id="mmTotal"></div>
+        <div class="fila"><button class="btn" style="flex:1">Guardar</button><button type="button" class="btn sec" data-act="cerrar">Cancelar</button></div></form>`;
+    }
+    $('velo').innerHTML = html;
+    $('velo').hidden = false;
+    if (H.modo === 'scan') iniciarLector();
+    if (H.modo === 'perfil') pintarResumenPerfil();
+    if (H.modo === 'metaMano') totalMetaMano();
+  }
+  const totalHtml = m => `<b>${n0(m.kcal)} <small>kcal</small></b><span>${resumenMacros(m)}</span>`;
+  function totalMetaMano() {
+    const v = id => parseFloat(String($(id).value).replace(',', '.')) || 0;
+    $('mmTotal').innerHTML = `<b>${n0(v('mmP') * 4 + v('mmC') * 4 + v('mmG') * 9)} <small>kcal</small></b>`;
+  }
+
+  // Lista de la hoja: sin búsqueda, tus platos y habituales; con búsqueda, lo tuyo + la tabla + Open Food Facts.
+  function resultados() {
+    const H = hoja;
+    const q = (H.busca || '').trim();
+    const fila = (a, g, extra) => `<div class="ali"><button class="txt" data-act="elegir" data-id="${esc(a.id)}" ${g ? `data-g="${g}"` : ''}><b>${esc(a.nombre)}</b><small>${g ? cant(a, g) + ' · ' + n0(macros(a, g).kcal) + ' kcal · P ' + n1(macros(a, g).prot) : n0(a.kcal) + ' kcal / 100 g · P ' + n1(a.prot)}</small></button>${extra || ''}</div>`;
+    if (!q) {
+      const platos = D.platos.map((p, i) => {
+        const s = suma(p.items.map(([id, g]) => { const a = alimento(id); return a ? macros(a, g) : { kcal: 0, prot: 0, carb: 0, grasa: 0 }; }));
+        return `<div class="ali"><button class="txt" data-act="ponPlato" data-id="${esc(p.id)}"><b>${esc(p.nombre)}</b><small>${p.items.length} cosas · ${n0(s.kcal)} kcal · P ${n0(s.prot)}</small></button><button class="mini" data-act="ponPlato" data-id="${esc(p.id)}" aria-label="Añadir ${esc(p.nombre)}">${ico('mas', 16, 2.6)}</button></div>`;
+      }).join('');
+      const habituales = D.habituales.map(h => ({ a: alimento(h.alimento), g: h.gramos })).filter(x => x.a)
+        .map(({ a, g }) => fila(a, g, `<button class="mini" data-act="rapida" data-id="${esc(a.id)}" data-g="${g}" aria-label="Añadir ${esc(a.nombre)}">${ico('mas', 16, 2.6)}</button>`)).join('');
+      return `${platos ? `<div class="grupo"><span class="eti">Mis platos · entran enteros</span><div class="lista">${platos}</div></div>` : ''}
+        ${habituales ? `<div class="grupo"><span class="eti">Habituales · con tu ración de siempre</span><div class="lista">${habituales}</div></div>`
+          : '<p class="nota">Busca arriba o escanea un código. Lo que apuntes a menudo saldrá aquí con tu ración de siempre, para apuntarlo con un toque.</p>'}`;
+    }
+    const locales = buscarLocal(q);
+    const off = H.off && H.off.q === q ? H.off : null;
+    const enOff = off && off.lista ? off.lista.filter(p => !D.alimentos.some(a => a.codigo && a.codigo === p.codigo)) : [];
+    return `${locales.length ? `<div class="lista">${locales.map(a => fila(a, 0, a.fuente === 'base' ? '' : `<span class="fuente ${a.fuente}">${a.fuente === 'off' ? 'Código' : 'Tuyo'}</span>`)).join('')}</div>` : `<p class="nota">No está entre tus alimentos ni en la tabla.</p>`}
+      <div class="grupo"><span class="eti">En Open Food Facts</span>
+      ${!off ? `<button class="btn sec ancho" data-act="buscarOFF">Buscar «${esc(q)}» en Open Food Facts</button>`
+        : off.cargando ? '<p class="nota">Buscando…</p>'
+        : off.error ? `<p class="nota">${esc(off.error)}</p><button class="btn sec ancho" data-act="buscarOFF">Probar otra vez</button>`
+        : enOff.length ? `<div class="lista">${enOff.map((p, i) => `<div class="ali"><button class="txt" data-act="elegirOFF" data-i="${off.lista.indexOf(p)}"><b>${esc(p.nombre)}</b><small>${n0(p.kcal)} kcal / 100 g · P ${n1(p.prot)}</small></button></div>`).join('')}</div>`
+        : '<p class="nota">Nada con ese nombre. Prueba con otra palabra, escanea el código o créalo a mano en Foods.</p>'}</div>`;
+  }
+
+  // ---------- Escáner ----------
+
+  let lector = null;
+  async function iniciarLector() {
+    const nota = $('scanNota');
+    if (!window.Html5Qrcode) { nota.textContent = 'El lector aún está cargando. Espera un segundo y vuelve a pulsar el escáner, o escribe el número.'; return; }
+    try {
+      const F = Html5QrcodeSupportedFormats;
+      lector = new Html5Qrcode('lector', { formatsToSupport: [F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E], verbose: false, experimentalFeatures: { useBarCodeDetectorIfSupported: true } });
+      await lector.start({ facingMode: 'environment' }, { fps: 12, qrbox: (w, h) => ({ width: Math.round(w * 0.8), height: Math.round(Math.min(h, w) * 0.4) }) },
+        texto => { if (navigator.vibrate) navigator.vibrate(60); pararLector(); porCodigo(texto); }, () => {});
+    } catch (e) {
+      nota.textContent = 'No puedo usar la cámara (' + (e && e.message || e) + '). Dale permiso en Ajustes → Safari → Cámara, o escribe el número.';
+    }
+  }
+  function pararLector() {
+    if (!lector) return;
+    const l = lector;
+    lector = null;
+    try { if (l.isScanning) l.stop().then(() => l.clear()).catch(() => {}); } catch (e) {}
+  }
+  async function porCodigo(codigo) {
+    codigo = String(codigo).replace(/\D/g, '');
+    if (codigo.length < 8) return avisar('Ese código es demasiado corto');
+    const ya = D.alimentos.find(a => a.codigo === codigo);
+    if (ya) return abrirRacion(ya, ya.gUnidad || 100);
+    if ($('scanNota')) $('scanNota').textContent = 'Buscando ' + codigo + ' en Open Food Facts…';
+    cargando(true);
+    let p = null, error = '';
+    try { p = await offCodigo(codigo); } catch (e) { error = 'No he podido conectar con Open Food Facts'; }
+    cargando(false);
+    if (!hoja) return;
+    if (p) {
+      const a = guardarDeOFF(p);
+      avisar('Encontrado y guardado en tus alimentos');
+      return abrirRacion(a, a.gUnidad || 100);
+    }
+    avisar(error || 'Ese producto no está en Open Food Facts: créalo copiando la etiqueta');
+    if (!error) abrirHoja({ modo: 'alimento', a: { codigo }, m: hoja.m, volverA: 'lista' });
+  }
+
+  function abrirRacion(a, g, extra) {
+    abrirHoja({ ...(hoja || {}), modo: 'racion', a, g, ...(extra || {}) });
+  }
+
+  // ---------- Apuntar ----------
+
+  function apuntar(items, comida, texto) {
+    const lista = items.map(([a, g]) => entrada(a, g));
+    enviar('apuntar', { dia: D.dia, comida, items: lista });
+    cerrarHoja();
+    if (vista !== 'today') { vista = 'today'; guardarVista(); pintar(); }
+    avisar(`${texto} a la ${nombreComida(comida).toLowerCase()}`, () => lista.forEach(x => enviar('borrarEntrada', { id: x.id })));
+  }
+  // «2 huevos», «1 lata de atún al natural», «150 g de pechuga de pollo».
+  function describir(a, g) {
+    const c = cant(a, g);
+    const nombre = a.nombre.replace(/ \(.*\)$/, '').toLowerCase();
+    return a.unidad && !/ (g|ml)$/.test(c) && sinAcentos(nombre).includes(sinAcentos(a.unidad)) ? c : c + ' de ' + nombre;
+  }
+  const que = describir;
+
+  // ---------- Toques ----------
+
+  const ACT = {
+    recargar: () => cargar(),
+    dia: t => {
+      const n = +t.dataset.n;
+      cargar(n === 0 ? D.hoy : diaMas(D.dia, n));
+    },
+    abrir: t => abrirHoja({ modo: 'lista', m: t.dataset.m }),
+    comida: t => { hoja.m = t.dataset.m; pintarHoja(); },
+    escanear: () => abrirHoja({ ...(hoja || { m: siguienteComida() }), modo: 'scan' }),
+    volver: () => {
+      pararLector();
+      if (hoja.volverA === 'foods' || !hoja.m) return cerrarHoja();
+      abrirHoja({ ...hoja, modo: 'lista' });
+    },
+    cerrar: () => cerrarHoja(),
+    elegir: t => { const a = alimento(t.dataset.id); if (a) abrirRacion(a, +t.dataset.g || a.gUnidad || 100); },
+    elegirOFF: t => { const p = hoja.off.lista[+t.dataset.i]; const a = guardarDeOFF(p); abrirRacion(a, a.gUnidad || 100); },
+    rapida: t => { const a = alimento(t.dataset.id); if (a) apuntar([[a, +t.dataset.g]], hoja.m, 'Añadido: ' + que(a, +t.dataset.g)); },
+    ponPlato: t => {
+      const p = D.platos.find(x => x.id === t.dataset.id);
+      const items = p.items.map(([id, g]) => [alimento(id), g]).filter(x => x[0]);
+      if (!items.length) return avisar('Los alimentos de ese plato ya no existen');
+      apuntar(items, hoja.m, `Añadido «${p.nombre}»`);
+    },
+    racion: t => { hoja.g = +t.dataset.g; pintarHoja(); },
+    menos: () => { hoja.g = Math.max(0, (leerG() || 0) - paso()); pintarHoja(); },
+    masG: () => { hoja.g = (leerG() || 0) + paso(); pintarHoja(); },
+    entrada: t => {
+      const e = D.registro.find(x => x.id === t.dataset.id);
+      if (!e) return;
+      // Si el alimento ya no existe, se edita con lo que guardó la entrada.
+      const a = alimento(e.alimento) || { id: e.alimento, nombre: e.nombre, kcal: e.kcal / e.gramos * 100, prot: e.prot / e.gramos * 100, carb: e.carb / e.gramos * 100, grasa: e.grasa / e.gramos * 100, unidad: '', gUnidad: 0 };
+      abrirHoja({ modo: 'racion', a, g: e.gramos, m: e.comida, entrada: e.id });
+    },
+    borrarEntrada: t => {
+      if (!seguro(t)) return;
+      const e = D.registro.find(x => x.id === hoja.entrada);
+      enviar('borrarEntrada', { id: hoja.entrada });
+      cerrarHoja();
+      if (e) avisar('Quitado: ' + e.nombre, () => enviar('apuntar', { dia: D.dia, comida: e.comida, items: [{ ...e, id: nid('r') }] }));
+    },
+    tip: () => {
+      const s = sugerencia(suma(D.registro));
+      if (s) apuntar(s.items.map(x => [x.a, x.g]), s.comida, 'Añadido: ' + s.items.map(x => describir(x.a, x.g)).join(' y '));
+    },
+    guardarPlato: t => {
+      const items = D.registro.filter(x => x.comida === t.dataset.m && alimento(x.alimento)).map(x => [x.alimento, x.gramos]);
+      if (items.length < 2) return avisar('Hace falta que los alimentos sigan existiendo');
+      abrirHoja({ modo: 'plato', p: { id: nid('p'), nombre: nombreComida(t.dataset.m) + ' de siempre', items } });
+    },
+    verPlato: t => { const p = D.platos.find(x => x.id === t.dataset.id); if (p) abrirHoja({ modo: 'plato', p: { ...p } }); },
+    borrarPlato: t => { if (!seguro(t)) return; enviar('borrarPlato', { id: hoja.p.id }); cerrarHoja(); avisar('Plato borrado'); },
+    nuevoAlimento: () => abrirHoja({ modo: 'alimento', a: {}, volverA: 'foods' }),
+    editarAlimento: t => { const a = D.alimentos.find(x => x.id === t.dataset.id); if (a) abrirHoja({ modo: 'alimento', a: { ...a }, volverA: 'foods' }); },
+    borrarAlimento: t => {
+      if (!seguro(t)) return;
+      enviar('borrarAlimento', { id: hoja.a.id });
+      cerrarHoja();
+      avisar('Alimento borrado. Lo que ya apuntaste se queda igual.');
+    },
+    buscarOFF: async () => {
+      const q = (hoja.busca || '').trim();
+      if (!q) return;
+      hoja.off = { q, cargando: true };
+      $('resultados').innerHTML = resultados();
+      try {
+        const lista = await offBuscar(q);
+        if (hoja && hoja.off && hoja.off.q === q) hoja.off = { q, lista };
+      } catch (e) {
+        if (hoja && hoja.off) hoja.off = { q, error: 'Open Food Facts no contesta ahora. Prueba en un rato o escanea el código.' };
+      }
+      if (hoja && hoja.modo === 'lista') $('resultados').innerHTML = resultados();
+    },
+    perfil: () => { perfilForm = { objetivo: 'ganar', actividad: 'medio', ...D.perfil, peso: (D.pesos[D.pesos.length - 1] || {}).kg || '' }; abrirHoja({ modo: 'perfil' }); },
+    perfilChip: t => {
+      perfilForm[t.dataset.campo] = t.dataset.v;
+      t.parentNode.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b === t));
+      pintarResumenPerfil();
+    },
+    metaMano: () => abrirHoja({ modo: 'metaMano' }),
+    aplicarAjuste: () => {
+      const aj = revisarAjuste(D.pesos, D.meta, D.perfil.objetivo, D.hoy);
+      if (!aj.nueva) return;
+      enviar('meta', { ...aj.nueva, motivo: (aj.cambio > 0 ? '+' : '') + aj.cambio + ' kcal (ritmo ' + n1(aj.ritmo) + ' kg/sem)' });
+      avisar('Nueva meta: ' + n0(aj.nueva.kcal) + ' kcal');
+    },
+    mantenerMeta: () => {
+      const m = D.meta;
+      enviar('meta', { kcal: m.kcal, prot: m.prot, carb: m.carb, grasa: m.grasa, motivo: 'revisada, sin cambios' });
+      avisar('Perfecto. La vuelvo a revisar en 2 semanas');
+    },
+  };
+  const siguienteComida = () => (COMIDAS.find(([id]) => !D.registro.some(x => x.comida === id)) || COMIDAS[3])[0];
+  const leerG = () => parseFloat(String(($('gramos') || {}).value || '').replace(',', '.'));
+  const paso = () => (hoja.a.gUnidad && hoja.a.gUnidad < 30 ? hoja.a.gUnidad : 10);
+  // Los botones de borrar piden un segundo toque.
+  function seguro(t) {
+    if (t.classList.contains('seguro')) return true;
+    t.classList.add('seguro');
+    t.dataset.texto = t.textContent;
+    t.textContent = 'Toca otra vez para confirmar';
+    setTimeout(() => { if (t.isConnected) { t.classList.remove('seguro'); t.textContent = t.dataset.texto; } }, 3000);
+    return false;
+  }
+
+  document.addEventListener('click', e => {
+    if (e.target === $('velo')) return cerrarHoja();
+    const t = e.target.closest('[data-tab],[data-act]');
+    if (!t || t.disabled) return;
+    if (t.dataset.tab) {
+      vista = t.dataset.tab;
+      guardarVista();
+      pintar();
+      $('vista').scrollTop = 0;
+      return;
+    }
+    if (ACT[t.dataset.act]) {
+      e.preventDefault();
+      ACT[t.dataset.act](t);
+    }
+  });
+  $('mas').innerHTML = ico('mas', 20, 2.4);
+  $('mas').onclick = () => {
+    if (vista === 'foods') return ACT.nuevoAlimento();
+    if (vista === 'progress') return $('peso') && $('peso').focus();
+    abrirHoja({ modo: 'lista', m: siguienteComida() });
+  };
+  $('deshacer').onclick = () => { if (deshacer) deshacer(); deshacer = null; $('toast').classList.remove('ver'); };
+
+  document.addEventListener('input', e => {
+    const id = e.target.id;
+    if (id === 'buscar') { hoja.busca = e.target.value; $('resultados').innerHTML = resultados(); }
+    if (id === 'gramos') { hoja.g = leerG() || 0; $('total').innerHTML = totalHtml(macros(hoja.a, hoja.g)); }
+    if (id === 'filtro') { const q = sinAcentos(e.target.value.trim()); document.querySelectorAll('#listaFoods .ali').forEach(r => { r.hidden = !r.dataset.nombre.includes(q); }); }
+    if (/^pf/.test(id)) pintarResumenPerfil();
+    if (/^mm/.test(id)) totalMetaMano();
+  });
+
+  document.addEventListener('submit', e => {
+    e.preventDefault();
+    const f = e.target.dataset.form;
+    const num = id => parseFloat(String($(id).value).replace(',', '.'));
+    if (f === 'buscar') { document.activeElement.blur(); if (hoja.busca && hoja.busca.trim()) ACT.buscarOFF(); }
+    if (f === 'racion') {
+      const g = leerG();
+      if (!(g > 0)) return avisar('Pon una cantidad');
+      if (hoja.entrada) {
+        enviar('editarEntrada', { id: hoja.entrada, gramos: Math.round(g), comida: hoja.m });
+        cerrarHoja();
+        return avisar('Guardado');
+      }
+      apuntar([[hoja.a, g]], hoja.m, 'Añadido: ' + que(hoja.a, g));
+    }
+    if (f === 'codigo') porCodigo($('codigoMano').value);
+    if (f === 'alimento') {
+      const a = {
+        id: hoja.a.id || nid('a'), nombre: $('alNombre').value.trim(), kcal: num('alK'), prot: num('alP') || 0, carb: num('alC') || 0, grasa: num('alG') || 0,
+        unidad: $('alU').value.trim(), gUnidad: Math.round(num('alGU')) || 0, ml: !!hoja.a.ml, codigo: hoja.a.codigo || '', fuente: hoja.a.fuente || 'tuyo',
+      };
+      if (!a.nombre) return avisar('Pon un nombre');
+      if (!(a.kcal >= 0 && a.kcal <= 950)) return avisar('Las kcal por 100 g van de 0 a 950');
+      if (a.gUnidad && !a.unidad) a.unidad = 'unidad';
+      enviar('alimento', a);
+      if (hoja.m && hoja.volverA === 'lista') return abrirRacion(a, a.gUnidad || 100, { volverA: '' });
+      cerrarHoja();
+      avisar('Guardado en tus alimentos');
+    }
+    if (f === 'plato') {
+      const nombre = $('plNombre').value.trim();
+      if (!nombre) return avisar('Pon un nombre al plato');
+      enviar('plato', { ...hoja.p, nombre });
+      cerrarHoja();
+      avisar(`Plato guardado: «${nombre}»`);
+    }
+    if (f === 'peso') {
+      const kg = num('peso');
+      if (!(kg > 30 && kg < 250)) return avisar('Escribe tu peso en kg, por ejemplo 72,4');
+      enviar('peso', { dia: D.hoy, kg: Math.round(kg * 10) / 10 });
+      avisar('Peso guardado: ' + n1(kg) + ' kg');
+    }
+    if (f === 'perfil') {
+      const m = leerPerfil();
+      if (!m) return;
+      const p = perfilForm;
+      const primera = !D.meta;
+      enviar('perfil', { sexo: p.sexo, edad: Math.round(p.edad), altura: Math.round(p.altura), actividad: p.actividad, objetivo: p.objetivo, peso: Math.round(p.peso * 10) / 10, meta: { kcal: m.kcal, prot: m.prot, carb: m.carb, grasa: m.grasa } });
+      cerrarHoja();
+      if (primera) { vista = 'today'; guardarVista(); pintar(); }
+      avisar(primera ? 'Listo. Apunta lo primero que comas con el +' : 'Meta recalculada: ' + n0(m.kcal) + ' kcal');
+    }
+    if (f === 'metaMano') {
+      const m = { prot: Math.round(num('mmP')), carb: Math.round(num('mmC')), grasa: Math.round(num('mmG')) };
+      m.kcal = m.prot * 4 + m.carb * 4 + m.grasa * 9;
+      if (!(m.kcal >= 1000 && m.kcal <= 6000)) return avisar('Con esos macros salen ' + n0(m.kcal || 0) + ' kcal: deben quedar entre 1000 y 6000');
+      enviar('meta', { ...m, motivo: 'a mano' });
+      cerrarHoja();
+      avisar('Meta guardada: ' + n0(m.kcal) + ' kcal');
+    }
+  });
+
+  function avisar(t, undo) {
+    $('toastTxt').textContent = t;
+    deshacer = undo || null;
+    $('deshacer').hidden = !undo;
+    $('toast').classList.add('ver');
+    clearTimeout(avisar.t);
+    avisar.t = setTimeout(() => $('toast').classList.remove('ver'), undo ? 4500 : 3000);
+  }
+  function guardarVista() { try { localStorage.setItem('cherry.vista', vista); } catch (e) {} }
+
+  function pantallaClave(error) {
+    $('nav').hidden = true;
+    $('mas').hidden = true;
+    $('titulo').textContent = 'Cherry';
+    $('sub').innerHTML = '';
+    if (!URL_API) {
+      $('vista').innerHTML = `<div class="tarjeta"><p><b>Falta conectar tu servidor.</b> Abre Cherry con el enlace o el código QR que te dio tu servidor de Google al instalarlo. Solo hace falta la primera vez.</p></div>`;
+      return;
+    }
+    $('vista').innerHTML = `<form class="tarjeta" id="formClave" autocomplete="off">
+        <p>${error ? esc(error) + '. ' : ''}Escribe tu clave para entrar (solo la primera vez).</p>
+        <input class="campo" name="clave" placeholder="Clave" autocapitalize="off" autocorrect="off" spellcheck="false">
+        <button class="btn">Entrar</button></form>`;
+    $('formClave').onsubmit = e => {
+      e.preventDefault();
+      const c = new FormData(e.target).get('clave').trim();
+      if (c) location.href = location.pathname + '?k=' + encodeURIComponent(c);
+    };
+  }
+
+  // ---------- Arranque ----------
+
+  // La dirección conserva ?api y ?k: el icono de la pantalla de inicio del iPhone tiene su propio almacenamiento
+  // y los necesita la primera vez que se abre.
+  if (!URL_API || !K) pantallaClave();
+  else {
+    const c = leerCache();
+    if (c && c.hoy === hoyLocal()) { D = c; pintar(); }
+    if (cola.length) vaciar();
+    else cargar(hoyLocal());
+  }
+</script>
+</body>
+</html>
