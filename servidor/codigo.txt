@@ -65,9 +65,18 @@ function configurar() {
 // ---------- Web ----------
 
 // GET ?k=CLAVE&accion=datos[&dia=]  → datos de la app en JSON
+// GET ?k=CLAVE&accion=widget         → lo de hoy en pocos números, para el widget de Scriptable
 // GET (sin clave) o ?accion=instalar → página con el QR para abrir Cherry en el iPhone
 function doGet(e) {
   const p = e.parameter;
+  if (p.accion === 'widget') {
+    try {
+      comprobar_(p.k);
+      return json_(widget_());
+    } catch (err) {
+      return json_({ error: err.message });
+    }
+  }
   if (p.accion === 'datos') {
     try {
       comprobar_(p.k);
@@ -335,6 +344,18 @@ function datos_(dia) {
     meta: metas.length ? metas[metas.length - 1] : null,
     metas: metas.slice(-6),
   };
+}
+
+// Totales de hoy contra la meta. El widget se refresca solo cada ~15 min: cuanto menos lea, mejor.
+function widget_() {
+  const hoy = hoy_();
+  const es = leer_('Registro').filter(r => diaTexto_(r.dia) === hoy);
+  const sum = c => Math.round(es.reduce((a, r) => a + Number(r[c] || 0), 0));
+  const metas = leer_('Metas').map(r => ({ dia: diaTexto_(r.dia), kcal: Number(r.kcal), prot: Number(r.prot), carb: Number(r.carb), grasa: Number(r.grasa) }))
+    .sort((a, b) => (a.dia < b.dia ? -1 : 1));
+  const comidas = {};
+  COMIDAS.forEach(c => { comidas[c] = es.some(r => r.comida === c); });
+  return { hoy, kcal: sum('kcal'), prot: sum('prot'), carb: sum('carb'), grasa: sum('grasa'), meta: metas.length ? metas[metas.length - 1] : null, comidas };
 }
 
 // ---------- Hoja ----------

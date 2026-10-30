@@ -184,10 +184,36 @@
   .toast { position: absolute; left: 16px; right: 16px; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); background: var(--text); color: var(--ink); padding: 12px 16px; border-radius: 14px; font-weight: 600; font-size: 14px; opacity: 0; transform: translateY(8px); transition: .25s; pointer-events: none; z-index: 8; display: flex; justify-content: space-between; gap: 10px; }
   .toast.ver { opacity: 1; transform: none; pointer-events: auto; }
   .toast button { background: none; border: 0; padding: 0; color: var(--ink); font-weight: 700; text-decoration: underline; }
+
+  /* Pantalla de carga: las dos cerezas se balancean del rabito mientras llegan tus datos. */
+  .splash { position: fixed; inset: 0; z-index: 50; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; transition: opacity .45s ease; }
+  .splash.fuera { opacity: 0; pointer-events: none; }
+  .splash .logo { width: 108px; height: 108px; border-radius: 28px; background: var(--cherry); display: grid; place-items: center; transition: transform .45s ease; }
+  .splash.fuera .logo { transform: scale(1.15); }
+  .splash .logo svg { transform-origin: 56% 18%; animation: balanceo 1.6s ease-in-out infinite; }
+  .splash .nombre { font-size: 30px; font-weight: 700; letter-spacing: -.02em; }
+  .splash .puntos { display: flex; gap: 8px; height: 12px; }
+  .splash .puntos i { width: 10px; height: 10px; border-radius: 5px; background: var(--cherry); animation: bote 1s ease-in-out infinite; }
+  .splash .puntos i:nth-child(2) { animation-delay: .15s; background: var(--pro); }
+  .splash .puntos i:nth-child(3) { animation-delay: .3s; background: var(--car); }
+  .splash .puntos i:nth-child(4) { animation-delay: .45s; background: var(--fat); }
+  .splash .frase { font-size: 14px; color: var(--muted); height: 20px; transition: opacity .25s; }
+  @keyframes balanceo { 0%, 100% { transform: rotate(-7deg); } 50% { transform: rotate(7deg); } }
+  @keyframes bote { 0%, 100% { transform: translateY(2px); opacity: .5; } 50% { transform: translateY(-4px); opacity: 1; } }
+
+  /* Menús */
+  .receta-nota { margin: -6px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+  .etiq { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--fat); }
   @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 </style>
 </head>
 <body>
+<div class="splash" id="splash" role="status" aria-label="Cargando">
+  <div class="logo" aria-hidden="true"><svg width="70" height="70" viewBox="0 0 24 24" fill="none" stroke="#0d0b0c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3c-1 4-3 7-5.5 9.5M13 3c1.5 3.5 3.5 6 5.5 8"/><path d="M13 3c2-1 4-.8 5.5.5"/><circle cx="7.5" cy="16.5" r="4" fill="#0d0b0c"/><circle cx="18.5" cy="15.5" r="4" fill="#0d0b0c"/></svg></div>
+  <div class="nombre">Cherry</div>
+  <div class="puntos" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+  <div class="frase" id="frase">Abriendo tu despensa…</div>
+</div>
 <div class="app">
   <div class="carga" id="carga"></div>
   <header class="cab"><h1 id="titulo">Cherry</h1><div class="sub" id="sub"></div>
@@ -201,6 +227,72 @@
 <!-- Lector de códigos de barras (solo se usa al pulsar el escáner). -->
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" defer></script>
 
+<!-- Widget de Scriptable: la app lo copia con tu servidor y tu clave ya puestos. -->
+<script type="text/plain" id="widgetCodigo">
+// Widget de Cherry para Scriptable. Tamaño pequeño o mediano. Al tocarlo se abre Cherry.
+const URL = '__URL__';
+const APP = '__APP__';
+const C = { fondo: '#0d0b0c', cereza: '#ff5c7a', texto: '#f6f2f2', gris: '#a1979a', pista: '#2e272a', pro: '#6fb7ff', car: '#ffcf5a', gra: '#5ee0b0' };
+const col = c => new Color(c);
+const num = x => Math.round(x).toLocaleString('es-ES');
+let d;
+try { d = await new Request(URL).loadJSON(); } catch (e) { d = null; }
+const w = new ListWidget();
+w.backgroundColor = col(C.fondo);
+w.setPadding(14, 16, 14, 16);
+w.url = APP;
+w.refreshAfterDate = new Date(Date.now() + 15 * 60000);
+function texto(pila, t, color, fuente) { const x = pila.addText(String(t)); x.textColor = col(color); x.font = fuente; x.lineLimit = 1; return x; }
+function barra(pila, valor, max, color, ancho) {
+  const p = pila.addStack();
+  p.size = new Size(ancho, 6);
+  p.cornerRadius = 3;
+  p.backgroundColor = col(C.pista);
+  const f = Math.max(0, Math.min(1, max ? valor / max : 0));
+  if (f > 0.03) {
+    const r = p.addStack();
+    r.size = new Size(Math.round(ancho * f), 6);
+    r.cornerRadius = 3;
+    r.backgroundColor = col(color);
+  }
+  p.addSpacer();
+}
+if (!d || d.error || !d.meta) {
+  texto(w, 'Cherry', C.cereza, Font.boldSystemFont(16));
+  texto(w, !d ? 'Sin conexión' : d.error ? d.error : 'Abre Cherry y pon tu meta', C.gris, Font.systemFont(13));
+} else {
+  const queda = d.meta.kcal - d.kcal;
+  const mediano = config.widgetFamily !== 'small';
+  const fila = w.addStack();
+  const izq = fila.addStack();
+  izq.layoutVertically();
+  texto(izq, queda >= 0 ? 'TE QUEDAN' : 'TE HAS PASADO', C.gris, Font.boldSystemFont(10));
+  texto(izq, num(Math.abs(queda)), queda >= 0 ? C.cereza : C.car, Font.boldRoundedSystemFont(34));
+  texto(izq, 'kcal de ' + num(d.meta.kcal), C.gris, Font.mediumSystemFont(11));
+  izq.addSpacer(8);
+  barra(izq, d.kcal, d.meta.kcal, C.cereza, mediano ? 120 : 118);
+  if (mediano) {
+    fila.addSpacer();
+    const der = fila.addStack();
+    der.layoutVertically();
+    [['Proteína', d.prot, d.meta.prot, C.pro], ['Carbos', d.carb, d.meta.carb, C.car], ['Grasa', d.grasa, d.meta.grasa, C.gra]].forEach(([n, v, m, c], i) => {
+      if (i) der.addSpacer(8);
+      const t = der.addStack();
+      t.size = new Size(130, 0);
+      texto(t, n, C.gris, Font.mediumSystemFont(11));
+      t.addSpacer();
+      texto(t, num(v) + ' / ' + num(m) + ' g', C.texto, Font.semiboldSystemFont(11));
+      der.addSpacer(3);
+      barra(der, v, m, c, 130);
+    });
+  }
+  w.addSpacer();
+  if (!mediano) texto(w, 'P ' + num(d.prot) + ' / ' + num(d.meta.prot) + ' g', C.pro, Font.semiboldSystemFont(12));
+}
+Script.setWidget(w);
+if (!config.runsInWidget) await w.presentMedium();
+Script.complete();
+</script>
 <script>
 // <calculos>
 // Metas y ajustes. Funciones puras: las prueba pruebas/test.js.
@@ -411,6 +503,61 @@ function revisarAjuste(pesos, meta, objetivo, hoy) {
     cerveza: ['Cerveza', 43, 0.5, 3.6, 0, 'caña', 200, 1],
   };
 
+  // Menús saludables con alimentos de la tabla. Las cantidades son de partida: la app las escala
+  // a lo que te toca en esa comida según tu meta. obj = objetivos con los que encaja.
+  const RECETAS = [
+    { id: 'avenaCac', c: 'des', obj: 'ganar mantener', n: 'Avena con plátano y crema de cacahuete', items: [['avena', 80], ['leche', 300], ['platano', 120], ['cacahuete', 16]], nota: 'Cuece la avena con la leche 3 minutos y pon encima el plátano en rodajas y la crema.' },
+    { id: 'batidoPost', c: 'des', obj: 'ganar mantener', n: 'Batido para después de entrenar', items: [['leche', 300], ['whey', 30], ['platano', 120], ['avena', 40]], nota: 'Todo a la batidora 30 segundos. Va genial al volver de entrenar.' },
+    { id: 'tostadaHuevo', c: 'des', obj: 'ganar mantener perder', n: 'Tostadas con huevos revueltos y tomate', items: [['panInt', 60], ['huevo', 110], ['tomate', 120], ['aceite', 5]], nota: 'Tuesta el pan, ralla el tomate encima y haz los huevos revueltos con unas gotas de aceite.' },
+    { id: 'skyrFrutos', c: 'des', obj: 'mantener perder', n: 'Skyr con fresas, avena y nueces', items: [['skyr', 250], ['fresas', 150], ['avena', 30], ['nueces', 15]], nota: 'En un bol: skyr, fresas troceadas, la avena cruda y las nueces por encima.' },
+    { id: 'tostadaPavo', c: 'des', obj: 'mantener perder', n: 'Tostadas de pavo y queso fresco con naranja', items: [['panInt', 60], ['pavoLonchas', 60], ['burgos', 60], ['naranja', 200]], nota: 'Pan tostado con el queso fresco y el pavo. La naranja, de postre o en zumo natural.' },
+
+    { id: 'arrozPollo', c: 'com', obj: 'ganar mantener perder', n: 'Arroz con pollo y verduras', items: [['arroz', 90], ['pollo', 180], ['pimiento', 100], ['calabacin', 150], ['aceite', 10]], nota: 'Saltea el pollo en dados con el pimiento y el calabacín, y mézclalo con el arroz cocido.' },
+    { id: 'lentejas', c: 'com', obj: 'ganar mantener', n: 'Lentejas con arroz y verduras', items: [['lentejasBote', 300], ['arroz', 50], ['zanahoria', 70], ['cebolla', 60], ['aceite', 10]], nota: 'Sofríe cebolla y zanahoria, añade las lentejas de bote escurridas 5 minutos y sirve con el arroz.' },
+    { id: 'pastaAtun', c: 'com', obj: 'ganar mantener', n: 'Pasta con atún, tomate y espinacas', items: [['pasta', 100], ['atun', 104], ['tomateFrito', 100], ['espinacas', 60], ['aceite', 5]], nota: 'Mientras se cuece la pasta, calienta el tomate con las espinacas y el atún. Mezcla y listo.' },
+    { id: 'salmonPatata', c: 'com', obj: 'ganar mantener perder', n: 'Salmón con patata y brócoli', items: [['salmon', 150], ['patata', 250], ['brocoli', 200], ['aceite', 5]], nota: 'Patata y brócoli al vapor o 6 minutos al microondas; el salmón a la plancha, 4 minutos por lado.' },
+    { id: 'ensaladaGarb', c: 'com', obj: 'mantener perder', n: 'Ensalada de garbanzos con huevo y atún', items: [['garbanzos', 200], ['huevo', 110], ['atun', 52], ['tomate', 120], ['lechuga', 80], ['aceite', 10]], nota: 'Garbanzos de bote lavados, huevo duro, atún, tomate y lechuga. Aliña con el aceite.' },
+    { id: 'terneraQuinoa', c: 'com', obj: 'ganar mantener perder', n: 'Ternera con quinoa y pimientos', items: [['ternera', 160], ['quinoa', 70], ['pimiento', 150], ['cebolla', 60], ['aceite', 10]], nota: 'Cuece la quinoa 12 minutos; saltea la ternera en tiras con el pimiento y la cebolla.' },
+
+    { id: 'skyrPlatano', c: 'mer', obj: 'ganar mantener perder', n: 'Skyr con plátano y almendras', items: [['skyr', 150], ['platano', 120], ['almendras', 20]], nota: 'Un bol y 1 minuto. Mucha proteína para lo que llena.' },
+    { id: 'bocataPavo', c: 'mer', obj: 'ganar mantener', n: 'Bocadillo de pavo y tomate', items: [['panBarra', 80], ['pavoLonchas', 60], ['tomate', 60], ['aceite', 5]], nota: 'Pan con tomate restregado, un hilo de aceite y el pavo.' },
+    { id: 'tortitasCac', c: 'mer', obj: 'ganar', n: 'Tortitas de arroz con crema de cacahuete y plátano', items: [['tortitas', 24], ['cacahuete', 32], ['platano', 120]], nota: 'Unta las tortitas y pon el plátano en rodajas encima. Buena antes de entrenar.' },
+    { id: 'requesonKiwi', c: 'mer', obj: 'mantener perder', n: 'Requesón con kiwi y nueces', items: [['requeson', 150], ['kiwi', 150], ['nueces', 10]], nota: 'Requesón con el kiwi troceado y las nueces partidas.' },
+
+    { id: 'tortillaEsp', c: 'cen', obj: 'ganar mantener perder', n: 'Tortilla de espinacas con pan', items: [['huevo', 165], ['espinacas', 100], ['panInt', 60], ['aceite', 5]], nota: 'Saltea las espinacas 2 minutos, añade los huevos batidos y cuaja a fuego medio.' },
+    { id: 'merluzaBoniato', c: 'cen', obj: 'ganar mantener perder', n: 'Merluza con boniato y judías verdes', items: [['merluza', 200], ['boniato', 200], ['judias', 150], ['aceite', 10]], nota: 'Boniato al horno o al microondas, judías al vapor y la merluza a la plancha.' },
+    { id: 'wrapPollo', c: 'cen', obj: 'ganar mantener', n: 'Wraps de pollo con aguacate', items: [['wrap', 120], ['pollo', 150], ['lechuga', 50], ['tomate', 120], ['aguacate', 50]], nota: 'Pollo a la plancha en tiras con lechuga, tomate y aguacate. Enrolla y a la sartén 1 minuto.' },
+    { id: 'tofuArroz', c: 'cen', obj: 'ganar mantener perder', n: 'Salteado de tofu, champiñones y arroz', items: [['tofu', 200], ['champis', 150], ['cebolla', 60], ['arroz', 60], ['aceite', 10]], nota: 'Tofu en dados bien dorado con los champiñones y la cebolla. Sirve con el arroz.' },
+    { id: 'pavoEnsalada', c: 'cen', obj: 'mantener perder', n: 'Pavo a la plancha con patata y ensalada', items: [['pavo', 180], ['patata', 200], ['lechuga', 80], ['tomate', 120], ['aceite', 10]], nota: 'Patata cocida o al microondas, ensalada y el pavo a la plancha.' },
+  ];
+  // Parte de las kcal del día que va a cada comida.
+  const PARTE = { des: 0.25, com: 0.35, mer: 0.15, cen: 0.25 };
+  const objetivo = () => (OBJETIVO[D.perfil.objetivo] ? D.perfil.objetivo : 'ganar');
+
+  // Recetas de esa comida que encajan con tu objetivo. Para perder grasa, primero las de más proteína por kcal.
+  function recetasPara(m) {
+    const o = objetivo();
+    const lista = RECETAS.filter(r => r.c === m && r.obj.split(' ').includes(o));
+    if (o !== 'perder') return lista;
+    const dens = r => { const s = suma(r.items.map(([k, g]) => macros(alimento('b:' + k), g))); return s.prot / s.kcal; };
+    return lista.sort((a, b) => dens(b) - dens(a));
+  }
+  // Las kcal que te tocan en esa comida: hoy, si aún no la has hecho, se reparte lo que te queda entre las comidas que faltan.
+  function kcalComida(m) {
+    const base = D.meta.kcal * PARTE[m];
+    if (D.dia !== D.hoy || D.registro.some(x => x.comida === m)) return base;
+    const libres = COMIDAS.map(c => c[0]).filter(id => !D.registro.some(x => x.comida === id));
+    const queda = D.meta.kcal - suma(D.registro).kcal;
+    return Math.max(base * 0.6, queda * PARTE[m] / libres.reduce((s, id) => s + PARTE[id], 0));
+  }
+  // La receta con las cantidades escaladas a esas kcal (entre ×0,6 y ×1,8), en unidades enteras o de 5 en 5 g.
+  function escalar(r, kcal) {
+    const base = r.items.map(([k, g]) => [alimento('b:' + k), g]);
+    const f = Math.min(1.8, Math.max(0.6, kcal / suma(base.map(([a, g]) => macros(a, g))).kcal));
+    return base.map(([a, g]) => [a, a.gUnidad ? Math.max(1, Math.round(g * f / a.gUnidad)) * a.gUnidad : Math.max(5, Math.round(g * f / 5) * 5)]);
+  }
+  const totalItems = items => suma(items.map(([a, g]) => macros(a, g)));
+
   // ---------- Estado ----------
 
   let D = null;           // datos del servidor (más lo apuntado que aún no ha llegado)
@@ -462,6 +609,7 @@ function revisarAjuste(pesos, meta, objetivo, hoy) {
       if (/clave/i.test(e.message)) pantallaClave(e.message);
       else if (!D) $('vista').innerHTML = `<div class="tarjeta"><p><b>No se han podido cargar tus datos.</b> ${esc(e.message)}.</p><button class="btn sec" data-act="recargar">Probar otra vez</button></div>`;
       else avisar(e.red ? 'Sin conexión: enseño lo último que tenía' : 'Error: ' + e.message);
+      quitarSplash();
     }
     cargando(false);
   }
@@ -541,6 +689,28 @@ function revisarAjuste(pesos, meta, objetivo, hoy) {
     try { localStorage.setItem('cherry.cola', JSON.stringify(cola)); } catch (e) {}
   }
   function cargando(si) { $('carga').classList.toggle('ver', si); }
+
+  // ---------- Pantalla de carga ----------
+
+  const SPLASH_DESDE = Date.now();
+  const FRASES = ['Abriendo tu despensa…', 'Pesando la avena…', 'Contando la proteína…', 'Pelando el plátano…', 'Calentando la sartén…', 'Casi está…'];
+  let nFrase = 0;
+  const cambiarFrase = setInterval(() => {
+    const f = $('frase');
+    if (!f) return clearInterval(cambiarFrase);
+    f.style.opacity = 0;
+    setTimeout(() => { nFrase = (nFrase + 1) % FRASES.length; f.textContent = FRASES[nFrase]; f.style.opacity = 1; }, 250);
+  }, 1300);
+  // Se ve al menos un momento, aunque los datos lleguen enseguida (o salgan de la memoria del móvil).
+  function quitarSplash() {
+    const s = $('splash');
+    if (!s || s.classList.contains('fuera')) return;
+    setTimeout(() => {
+      s.classList.add('fuera');
+      clearInterval(cambiarFrase);
+      setTimeout(() => s.remove(), 500);
+    }, Math.max(0, 1100 - (Date.now() - SPLASH_DESDE)));
+  }
 
   // ---------- Alimentos ----------
 
@@ -635,6 +805,7 @@ function revisarAjuste(pesos, meta, objetivo, hoy) {
       $('sub').innerHTML = '';
       $('vista').innerHTML = bienvenida();
       prepararPerfil();
+      quitarSplash();
       return;
     }
     $('titulo').textContent = TABS.find(t => t[0] === vista)[1];
@@ -642,6 +813,7 @@ function revisarAjuste(pesos, meta, objetivo, hoy) {
     $('vista').innerHTML = VISTAS[vista]();
     $('nav').innerHTML = TABS.map(([id, t]) => `<button data-tab="${id}" ${id === vista ? 'aria-current="page"' : ''}>${ico(id, 22)}${t}</button>`).join('');
     D.registro.forEach(x => delete x.nuevo);
+    quitarSplash();
   }
   // Tras una respuesta del servidor: repinta sin perder el scroll ni lo que se está escribiendo en una hoja.
   function repintar() {
@@ -693,7 +865,8 @@ function revisarAjuste(pesos, meta, objetivo, hoy) {
         return `<div class="ali"><button class="txt" data-act="verPlato" data-id="${esc(p.id)}"><b>${esc(p.nombre)}</b><small>${p.items.map(([id, g]) => { const a = alimento(id); return a ? esc(a.nombre.replace(/ \(.*\)$/, '').toLowerCase()) + ' ' + cant(a, g) : ''; }).filter(Boolean).join(' · ')}</small></button><span class="num">${n0(s.kcal)}</span></div>`;
       }).join('');
       const mios = D.alimentos.slice().sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
-      return `<div class="rapido"><input id="filtro" placeholder="Buscar en tus alimentos" aria-label="Buscar en tus alimentos" autocomplete="off"><button data-act="escanear" aria-label="Escanear código de barras">${ico('codigo', 18)}</button></div>
+      return `${menusHtml()}
+        <div class="rapido"><input id="filtro" placeholder="Buscar en tus alimentos" aria-label="Buscar en tus alimentos" autocomplete="off"><button data-act="escanear" aria-label="Escanear código de barras">${ico('codigo', 18)}</button></div>
         <div class="grupo"><span class="eti">Mis platos</span>
           ${platos ? `<div class="lista">${platos}</div>` : '<p class="nota">Cuando una comida tenga dos o más cosas, pulsa «Guardar como plato» en Today y aquí podrás apuntarla entera con un toque.</p>'}</div>
         <div class="grupo"><span class="eti">Mis alimentos · por 100 g</span>
@@ -731,9 +904,41 @@ function revisarAjuste(pesos, meta, objetivo, hoy) {
         <section class="tarjeta"><span class="eti">Ajuste cada 2 semanas</span>${ajuste}</section>
         <section class="tarjeta"><span class="eti">Tu meta diaria</span>
           <div class="objetivos">${[[n0(D.meta.kcal), 'kcal'], [n0(D.meta.prot) + ' g', 'proteína'], [n0(D.meta.carb) + ' g', 'carbos'], [n0(D.meta.grasa) + ' g', 'grasa']].map(([v, t]) => `<div><b>${v}</b><span>${t}</span></div>`).join('')}</div>
-          <div class="fila"><button class="btn sec" data-act="perfil">Cambiar mis datos</button><button class="btn sec" data-act="metaMano">Meta a mano</button></div></section>`;
+          <div class="fila"><button class="btn sec" data-act="perfil">Cambiar mis datos</button><button class="btn sec" data-act="metaMano">Meta a mano</button></div></section>
+        <section class="tarjeta"><span class="eti">Widget del iPhone</span>
+          <p>Lo que te queda hoy y tus macros, en la pantalla de inicio. Se actualiza solo cada 15 minutos y al tocarlo abre Cherry.</p>
+          <p>1. Instala <b>Scriptable</b> (gratis, App Store).<br>2. Pulsa el botón de abajo, abre Scriptable, crea un script nuevo con <b>+</b>, pega el código y llámalo <b>Cherry</b>.<br>3. Mantén pulsada la pantalla de inicio → <b>+</b> → Scriptable → tamaño pequeño o mediano. Toca el widget y en <b>Script</b> elige Cherry.</p>
+          <button class="btn sec" data-act="copiarWidget">Copiar código del widget</button></section>`;
     },
   };
+
+  // Menús saludables de Foods: un día completo (una receta por comida, cambia cada día) o las recetas de una comida.
+  let menuSel = 'dia';
+  let menuOtro = 0;
+  function menusHtml() {
+    const fila = (r, items, etiq) => {
+      const s = totalItems(items);
+      return `<div class="ali"><button class="txt" data-act="verReceta" data-id="${r.id}" data-m="${r.c}">${etiq ? `<span class="etiq">${etiq}</span>` : ''}<b>${esc(r.n)}</b><small>${n0(s.kcal)} kcal · P ${n0(s.prot)} · C ${n0(s.carb)} · G ${n0(s.grasa)}</small></button></div>`;
+    };
+    let cuerpo;
+    if (menuSel === 'dia') {
+      const n = diasEntre('2026-01-01', D.hoy) + menuOtro;
+      const dia = COMIDAS.map(([m, nombre]) => {
+        const l = recetasPara(m);
+        const r = l[n % l.length];
+        return { r, items: escalar(r, D.meta.kcal * PARTE[m]), nombre };
+      });
+      const t = totalItems(dia.flatMap(x => x.items));
+      cuerpo = `<div class="lista">${dia.map(x => fila(x.r, x.items, x.nombre)).join('')}</div>
+        <p class="nota">Total <b style="color:var(--text)">${n0(t.kcal)} kcal</b> · P ${n0(t.prot)} · C ${n0(t.carb)} · G ${n0(t.grasa)}. Tu meta: ${n0(D.meta.kcal)} kcal y ${n0(D.meta.prot)} g de proteína.</p>
+        <button class="btn sec" data-act="otroMenu">Otro menú</button>`;
+    } else {
+      cuerpo = `<div class="lista">${recetasPara(menuSel).map(r => fila(r, escalar(r, D.meta.kcal * PARTE[menuSel]))).join('')}</div>`;
+    }
+    return `<div class="grupo"><span class="eti">Menús para ${OBJETIVO[objetivo()].nombre.toLowerCase()}</span>
+      <div class="chips">${[['dia', 'Día completo'], ...COMIDAS].map(([v, t]) => `<button type="button" data-act="menu" data-v="${v}" aria-pressed="${v === menuSel}">${t}</button>`).join('')}</div>
+      ${cuerpo}<p class="nota">Las cantidades ya están ajustadas a tu meta. Toca una receta para ver cómo se hace y apuntarla.</p></div>`;
+  }
 
   // Sugerencia de proteína con tus habituales (solo hoy y si falta bastante).
   function sugerencia(t) {
@@ -908,6 +1113,22 @@ function revisarAjuste(pesos, meta, objetivo, hoy) {
         <div class="total">${totalHtml(suma(p.items.map(([id, g]) => { const a = alimento(id); return a ? macros(a, g) : { kcal: 0, prot: 0, carb: 0, grasa: 0 }; })))}</div>
         <div class="fila"><button class="btn" style="flex:1">Guardar</button><button type="button" class="btn sec" data-act="cerrar">Cancelar</button></div>
         ${D.platos.some(x => x.id === p.id) ? '<button type="button" class="btn peligro" data-act="borrarPlato">Borrar plato</button>' : ''}</form>`;
+    } else if (H.modo === 'receta') {
+      const r = RECETAS.find(x => x.id === H.r);
+      const kc = kcalComida(H.m);
+      const items = escalar(r, kc);
+      html = `<form class="hoja" data-form="receta"><h3>${esc(r.n)}</h3><p class="receta-nota">${esc(r.nota)}</p>
+        <span class="eti">Para tu ${nombreComida(H.m).toLowerCase()} · unas ${n0(kc)} kcal</span>
+        <div class="lista">${items.map(([a, g]) => `<div class="ali"><div class="txt"><b>${esc(a.nombre)}</b><small>${cant(a, g)} · ${n0(macros(a, g).kcal)} kcal · P ${n1(macros(a, g).prot)}</small></div></div>`).join('')}</div>
+        <div class="total">${totalHtml(totalItems(items))}</div>
+        <span class="eti">¿En qué comida?</span>${chipsComida(H.m)}
+        <div class="fila"><button class="btn" style="flex:1">Añadir a la ${nombreComida(H.m).toLowerCase()}</button><button type="button" class="btn sec" data-act="guardarReceta">Guardar plato</button></div>
+        <button type="button" class="btn sec ancho" data-act="${H.volverA === 'foods' ? 'cerrar' : 'volver'}">${H.volverA === 'foods' ? 'Cerrar' : 'Volver'}</button></form>`;
+    } else if (H.modo === 'widget') {
+      html = `<div class="hoja"><h3>Código del widget</h3>
+        <p class="nota">No he podido copiarlo solo. Mantén pulsado el texto → Seleccionar todo → Copiar, y pégalo en un script nuevo de Scriptable.</p>
+        <textarea class="campo" id="codigoWidget" readonly style="height:220px;padding:12px;font:12px/1.4 ui-monospace,monospace;resize:none">${esc(codigoWidget())}</textarea>
+        <button class="btn sec ancho" data-act="cerrar">Cerrar</button></div>`;
     } else if (H.modo === 'perfil') {
       html = `<div class="hoja alta"><h3>Tus datos</h3>${formPerfil('Guardar y recalcular')}<button class="btn sec ancho" data-act="cerrar">Cancelar</button></div>`;
     } else if (H.modo === 'metaMano') {
@@ -940,11 +1161,20 @@ function revisarAjuste(pesos, meta, objetivo, hoy) {
         const s = suma(p.items.map(([id, g]) => { const a = alimento(id); return a ? macros(a, g) : { kcal: 0, prot: 0, carb: 0, grasa: 0 }; }));
         return `<div class="ali"><button class="txt" data-act="ponPlato" data-id="${esc(p.id)}"><b>${esc(p.nombre)}</b><small>${p.items.length} cosas · ${n0(s.kcal)} kcal · P ${n0(s.prot)}</small></button><button class="mini" data-act="ponPlato" data-id="${esc(p.id)}" aria-label="Añadir ${esc(p.nombre)}">${ico('mas', 16, 2.6)}</button></div>`;
       }).join('');
-      const habituales = D.habituales.map(h => ({ a: alimento(h.alimento), g: h.gramos })).filter(x => x.a)
+      const habituales = D.habituales.map(h => ({ a: alimento(h.alimento), g: h.gramos })).filter(x => x.a).slice(0, 6)
         .map(({ a, g }) => fila(a, g, `<button class="mini" data-act="rapida" data-id="${esc(a.id)}" data-g="${g}" aria-label="Añadir ${esc(a.nombre)}">${ico('mas', 16, 2.6)}</button>`)).join('');
+      // Tres ideas de su comida, distintas cada día, ya escaladas a lo que te toca.
+      const kc = kcalComida(H.m);
+      const todas = recetasPara(H.m);
+      const desde = diasEntre('2026-01-01', D.dia) % Math.max(1, todas.length);
+      const ideas = todas.slice(desde).concat(todas.slice(0, desde)).slice(0, 3).map(r => {
+        const s = totalItems(escalar(r, kc));
+        return `<div class="ali"><button class="txt" data-act="verReceta" data-id="${r.id}"><b>${esc(r.n)}</b><small>${n0(s.kcal)} kcal · P ${n0(s.prot)} · ${r.items.length} ingredientes</small></button><button class="mini" data-act="ponReceta" data-id="${r.id}" aria-label="Añadir ${esc(r.n)}">${ico('mas', 16, 2.6)}</button></div>`;
+      }).join('');
       return `${platos ? `<div class="grupo"><span class="eti">Mis platos · entran enteros</span><div class="lista">${platos}</div></div>` : ''}
         ${habituales ? `<div class="grupo"><span class="eti">Habituales · con tu ración de siempre</span><div class="lista">${habituales}</div></div>`
-          : '<p class="nota">Busca arriba o escanea un código. Lo que apuntes a menudo saldrá aquí con tu ración de siempre, para apuntarlo con un toque.</p>'}`;
+          : '<p class="nota">Busca arriba o escanea un código. Lo que apuntes a menudo saldrá aquí con tu ración de siempre, para apuntarlo con un toque.</p>'}
+        ${ideas ? `<div class="grupo"><span class="eti">Ideas para ${OBJETIVO[objetivo()].nombre.toLowerCase()} · unas ${n0(kc)} kcal</span><div class="lista">${ideas}</div></div>` : ''}`;
     }
     const locales = buscarLocal(q);
     const off = H.off && H.off.q === q ? H.off : null;
@@ -1102,6 +1332,25 @@ function revisarAjuste(pesos, meta, objetivo, hoy) {
       pintarResumenPerfil();
     },
     metaMano: () => abrirHoja({ modo: 'metaMano' }),
+    menu: t => { menuSel = t.dataset.v; menuOtro = 0; pintar(); },
+    otroMenu: () => { menuOtro++; pintar(); },
+    verReceta: t => abrirHoja(hoja ? { ...hoja, modo: 'receta', r: t.dataset.id, volverA: 'lista' } : { modo: 'receta', r: t.dataset.id, m: t.dataset.m, volverA: 'foods' }),
+    ponReceta: t => {
+      const r = RECETAS.find(x => x.id === t.dataset.id);
+      apuntar(escalar(r, kcalComida(hoja.m)), hoja.m, `Añadido «${r.n}»`);
+    },
+    guardarReceta: () => {
+      const r = RECETAS.find(x => x.id === hoja.r);
+      enviar('plato', { id: nid('p'), nombre: r.n, items: escalar(r, kcalComida(hoja.m)).map(([a, g]) => [a.id, g]) });
+      avisar('Guardado en tus platos: lo tienes arriba al pulsar +');
+    },
+    copiarWidget: () => {
+      const texto = codigoWidget();
+      const fallo = () => abrirHoja({ modo: 'widget' });
+      try {
+        navigator.clipboard.writeText(texto).then(() => avisar('Copiado. Pégalo en un script nuevo de Scriptable'), fallo);
+      } catch (e) { fallo(); }
+    },
     aplicarAjuste: () => {
       const aj = revisarAjuste(D.pesos, D.meta, D.perfil.objetivo, D.hoy);
       if (!aj.nueva) return;
@@ -1176,6 +1425,10 @@ function revisarAjuste(pesos, meta, objetivo, hoy) {
       apuntar([[hoja.a, g]], hoja.m, 'Añadido: ' + que(hoja.a, g));
     }
     if (f === 'codigo') porCodigo($('codigoMano').value);
+    if (f === 'receta') {
+      const r = RECETAS.find(x => x.id === hoja.r);
+      apuntar(escalar(r, kcalComida(hoja.m)), hoja.m, `Añadido «${r.n}»`);
+    }
     if (f === 'alimento') {
       const a = {
         id: hoja.a.id || nid('a'), nombre: $('alNombre').value.trim(), kcal: num('alK'), prot: num('alP') || 0, carb: num('alC') || 0, grasa: num('alG') || 0,
@@ -1230,9 +1483,14 @@ function revisarAjuste(pesos, meta, objetivo, hoy) {
     clearTimeout(avisar.t);
     avisar.t = setTimeout(() => $('toast').classList.remove('ver'), undo ? 4500 : 3000);
   }
+  // El código de Scriptable vive en <script id="widgetCodigo">; aquí se le pone tu servidor y tu clave.
+  const codigoWidget = () => $('widgetCodigo').textContent.trim()
+    .replace('__URL__', URL_API + '?accion=widget&k=' + encodeURIComponent(K))
+    .replace('__APP__', location.origin + location.pathname);
   function guardarVista() { try { localStorage.setItem('cherry.vista', vista); } catch (e) {} }
 
   function pantallaClave(error) {
+    quitarSplash();
     $('nav').hidden = true;
     $('mas').hidden = true;
     $('titulo').textContent = 'Cherry';
