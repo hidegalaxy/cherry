@@ -148,8 +148,12 @@
   /* Hojas */
   .velo { position: absolute; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: flex-end; z-index: 5; }
   .hoja { width: 100%; background: var(--surface); border-radius: 28px 28px 0 0; border-top: 1px solid var(--track); padding: 20px max(20px, env(safe-area-inset-right, 0px)) max(24px, env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; gap: 14px; max-height: 92%; overflow-y: auto; }
-  .hoja.alta { height: 92%; }
+  .hoja.alta { height: 86%; }
   .hoja h3 { margin: 0; font-size: 22px; letter-spacing: -.02em; overflow-wrap: anywhere; }
+  .hoja::before { content: ''; align-self: center; width: 40px; height: 5px; border-radius: 3px; background: var(--track); margin: -8px 0 -4px; flex: 0 0 auto; }
+  .cabh { display: flex; align-items: center; gap: 12px; }
+  .cabh h3 { flex: 1; min-width: 0; }
+  .cerrarX { width: 36px; height: 36px; flex: 0 0 36px; border-radius: 18px; border: 0; background: var(--track); color: var(--text); display: grid; place-items: center; }
   .hoja .por { color: var(--muted); font-size: 13px; margin-top: -8px; font-variant-numeric: tabular-nums; }
   .campo { width: 100%; height: 48px; border: 1px solid var(--track); background: var(--bg); border-radius: 14px; padding: 0 14px; outline: none; font-size: 16px; }
   .campo:focus { border-color: var(--muted); }
@@ -1067,7 +1071,7 @@ function revisarAjuste(pesos, meta, objetivo, hoy) {
     const H = hoja;
     let html = '';
     if (H.modo === 'lista') {
-      html = `<div class="hoja alta"><h3>Añadir a la ${nombreComida(H.m).toLowerCase()}</h3>${chipsComida(H.m)}
+      html = `<div class="hoja alta">${cabH('Añadir a la ' + nombreComida(H.m).toLowerCase())}${chipsComida(H.m)}
         <form class="rapido" data-form="buscar"><input id="buscar" type="search" enterkeyhint="search" placeholder="Busca: «pollo», «skyr», «avena»…" aria-label="Buscar alimento" value="${esc(H.busca || '')}" autocomplete="off"><button type="button" data-act="escanear" aria-label="Escanear código de barras">${ico('codigo', 18)}</button></form>
         <div id="resultados" class="grupo" style="gap:16px">${resultados()}</div></div>`;
     } else if (H.modo === 'racion') {
@@ -1117,7 +1121,7 @@ function revisarAjuste(pesos, meta, objetivo, hoy) {
       const r = RECETAS.find(x => x.id === H.r);
       const kc = kcalComida(H.m);
       const items = escalar(r, kc);
-      html = `<form class="hoja" data-form="receta"><h3>${esc(r.n)}</h3><p class="receta-nota">${esc(r.nota)}</p>
+      html = `<form class="hoja" data-form="receta">${cabH(r.n)}<p class="receta-nota">${esc(r.nota)}</p>
         <span class="eti">Para tu ${nombreComida(H.m).toLowerCase()} · unas ${n0(kc)} kcal</span>
         <div class="lista">${items.map(([a, g]) => `<div class="ali"><div class="txt"><b>${esc(a.nombre)}</b><small>${cant(a, g)} · ${n0(macros(a, g).kcal)} kcal · P ${n1(macros(a, g).prot)}</small></div></div>`).join('')}</div>
         <div class="total">${totalHtml(totalItems(items))}</div>
@@ -1130,7 +1134,7 @@ function revisarAjuste(pesos, meta, objetivo, hoy) {
         <textarea class="campo" id="codigoWidget" readonly style="height:220px;padding:12px;font:12px/1.4 ui-monospace,monospace;resize:none">${esc(codigoWidget())}</textarea>
         <button class="btn sec ancho" data-act="cerrar">Cerrar</button></div>`;
     } else if (H.modo === 'perfil') {
-      html = `<div class="hoja alta"><h3>Tus datos</h3>${formPerfil('Guardar y recalcular')}<button class="btn sec ancho" data-act="cerrar">Cancelar</button></div>`;
+      html = `<div class="hoja alta">${cabH('Tus datos')}${formPerfil('Guardar y recalcular')}<button class="btn sec ancho" data-act="cerrar">Cancelar</button></div>`;
     } else if (H.modo === 'metaMano') {
       const m = D.meta;
       html = `<form class="hoja" data-form="metaMano"><h3>Meta a mano</h3>
@@ -1145,6 +1149,8 @@ function revisarAjuste(pesos, meta, objetivo, hoy) {
     if (H.modo === 'perfil') pintarResumenPerfil();
     if (H.modo === 'metaMano') totalMetaMano();
   }
+  // Título de hoja con una ✕ para cerrar (además de tocar fuera o deslizar hacia abajo).
+  const cabH = t => `<div class="cabh"><h3>${esc(t)}</h3><button type="button" class="cerrarX" data-act="cerrar" aria-label="Cerrar"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>`;
   const totalHtml = m => `<b>${n0(m.kcal)} <small>kcal</small></b><span>${resumenMacros(m)}</span>`;
   function totalMetaMano() {
     const v = id => parseFloat(String($(id).value).replace(',', '.')) || 0;
@@ -1398,6 +1404,27 @@ function revisarAjuste(pesos, meta, objetivo, hoy) {
     if (vista === 'progress') return $('peso') && $('peso').focus();
     abrirHoja({ modo: 'lista', m: siguienteComida() });
   };
+  // Deslizar la hoja hacia abajo la cierra (solo si su contenido está arriba del todo).
+  let arrastre = null;
+  $('velo').addEventListener('touchstart', e => {
+    const h = e.target.closest('.hoja');
+    if (!h || h.scrollTop > 0 || /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
+    arrastre = { h, y: e.touches[0].clientY, d: 0 };
+  }, { passive: true });
+  $('velo').addEventListener('touchmove', e => {
+    if (!arrastre) return;
+    arrastre.d = Math.max(0, e.touches[0].clientY - arrastre.y);
+    if (arrastre.h.scrollTop > 0) { arrastre.h.style.transform = ''; arrastre = null; return; }
+    arrastre.h.style.transform = `translateY(${arrastre.d}px)`;
+  }, { passive: true });
+  $('velo').addEventListener('touchend', () => {
+    if (!arrastre) return;
+    const { h, d } = arrastre;
+    arrastre = null;
+    if (d > 110) cerrarHoja();
+    else { h.style.transition = 'transform .2s'; h.style.transform = ''; setTimeout(() => { h.style.transition = ''; }, 220); }
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && hoja) cerrarHoja(); });
   $('deshacer').onclick = () => { if (deshacer) deshacer(); deshacer = null; $('toast').classList.remove('ver'); };
 
   document.addEventListener('input', e => {
