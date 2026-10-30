@@ -30,6 +30,7 @@
     --pro: #6fb7ff;
     --car: #ffcf5a;
     --fat: #5ee0b0;
+    --agua: #5fd4f4;
     --font: 'Space Grotesk', -apple-system, system-ui, sans-serif;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -205,6 +206,22 @@
   @keyframes balanceo { 0%, 100% { transform: rotate(-7deg); } 50% { transform: rotate(7deg); } }
   @keyframes bote { 0%, 100% { transform: translateY(2px); opacity: .5; } 50% { transform: translateY(-4px); opacity: 1; } }
 
+  /* Agua y creatina */
+  .habitos { display: grid; grid-template-columns: 1.55fr 1fr; gap: 10px; }
+  .hab { background: var(--surface); border: 1px solid var(--line); border-radius: 22px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .hab .val { font-size: 22px; font-weight: 700; letter-spacing: -.03em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .hab .val small { font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: 0; }
+  .vasos { display: flex; gap: 3px; }
+  .vasos i { flex: 1; height: 8px; border-radius: 3px; background: var(--track); }
+  .vasos i.lleno { background: var(--agua); }
+  .hab .botones { display: flex; gap: 6px; }
+  .hab .botones button { flex: 1; height: 36px; border-radius: 11px; border: 0; background: var(--track); color: var(--agua); font-weight: 700; font-size: 13px; white-space: nowrap; padding: 0 4px; }
+  .hab .botones button.menos { flex: 0 0 36px; color: var(--muted); }
+  .crea { align-items: flex-start; }
+  .crea button.marca { width: 100%; height: 44px; border-radius: 13px; border: 1px dashed var(--track); background: none; color: var(--muted); font-weight: 700; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .crea button.marca[aria-pressed="true"] { background: var(--fat); border: 1px solid var(--fat); color: var(--ink); }
+  .crea small { font-size: 12px; color: var(--muted); }
+
   /* Menús */
   .receta-nota { margin: -6px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
   .etiq { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--fat); }
@@ -236,7 +253,7 @@
 // Widget de Cherry para Scriptable. Tamaño pequeño o mediano. Al tocarlo se abre Cherry.
 const URL = '__URL__';
 const APP = '__APP__';
-const C = { fondo: '#0d0b0c', cereza: '#ff5c7a', texto: '#f6f2f2', gris: '#a1979a', pista: '#2e272a', pro: '#6fb7ff', car: '#ffcf5a', gra: '#5ee0b0' };
+const C = { fondo: '#0d0b0c', cereza: '#ff5c7a', texto: '#f6f2f2', gris: '#a1979a', pista: '#2e272a', pro: '#6fb7ff', car: '#ffcf5a', gra: '#5ee0b0', agua: '#5fd4f4' };
 const col = c => new Color(c);
 const num = x => Math.round(x).toLocaleString('es-ES');
 let d;
@@ -291,7 +308,14 @@ if (!d || d.error || !d.meta) {
     });
   }
   w.addSpacer();
-  if (!mediano) texto(w, 'P ' + num(d.prot) + ' / ' + num(d.meta.prot) + ' g', C.pro, Font.semiboldSystemFont(12));
+  // Pie: agua y creatina (y la proteína en el pequeño).
+  const L = ml => (ml / 1000).toLocaleString('es-ES', { maximumFractionDigits: 1 }) + ' L';
+  const pie = w.addStack();
+  pie.centerAlignContent();
+  if (!mediano) { texto(pie, 'P ' + num(d.prot) + ' g', C.pro, Font.semiboldSystemFont(12)); pie.addSpacer(8); }
+  texto(pie, (mediano ? 'Agua ' + L(d.agua || 0) + ' de ' + L(d.metaAgua || 2500) : L(d.agua || 0)), C.agua, Font.semiboldSystemFont(12));
+  pie.addSpacer(8);
+  texto(pie, d.creatina ? (mediano ? 'Creatina ✓' : '✓') : (mediano ? 'Creatina pendiente' : ''), d.creatina ? C.gra : C.gris, Font.semiboldSystemFont(12));
 }
 Script.setWidget(w);
 if (!config.runsInWidget) await w.presentMedium();
@@ -366,6 +390,18 @@ function revisarAjuste(pesos, meta, objetivo, hoy) {
     nueva: { kcal: meta.kcal + cambio, prot: meta.prot, carb: Math.max(0, meta.carb + Math.round(cambio / 4)), grasa: meta.grasa },
   };
 }
+// Agua: 35 ml por kg, de 250 en 250 (el servidor hace la misma cuenta para el widget).
+function metaAgua(kg) {
+  return Math.round((+kg || 70) * 35 / 250) * 250;
+}
+// Días seguidos con creatina hasta hoy; si hoy aún no la has tomado, cuenta hasta ayer.
+function racha(diarios, hoy) {
+  const si = new Set(diarios.filter(x => x.creatina).map(x => x.dia));
+  let d = si.has(hoy) ? hoy : diaMas(hoy, -1);
+  let n = 0;
+  while (si.has(d)) { n++; d = diaMas(d, -1); }
+  return n;
+}
 // </calculos>
 </script>
 <script>
@@ -396,6 +432,7 @@ function revisarAjuste(pesos, meta, objetivo, hoy) {
     codigo: '<path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 8v8M10 8v8M13 8v8M17 8v8"/>',
     izq: '<path d="M15 6l-6 6 6 6"/>',
     der: '<path d="M9 6l6 6-6 6"/>',
+    ok: '<path d="M5 12l5 5 9-10"/>',
   };
   const ico = (n, s = 20, w = 2) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONOS[n]}</svg>`;
   const TABS = [['today', 'Today'], ['foods', 'Foods'], ['progress', 'Progress']];
@@ -680,6 +717,14 @@ function revisarAjuste(pesos, meta, objetivo, hoy) {
       if (d.meta) D.meta = { ...d.meta, dia: D.hoy, motivo: 'tus datos' };
     }
     if (que === 'meta') D.meta = { ...d, dia: D.hoy };
+    if (que === 'diario') {
+      const x = { ...(D.diarios.find(y => y.dia === d.dia) || { dia: d.dia, agua: 0, creatina: false }) };
+      if (d.agua != null) x.agua = d.agua;
+      if (d.creatina != null) x.creatina = !!d.creatina;
+      D.diarios = D.diarios.filter(y => y.dia !== d.dia).concat(x).sort((a, b) => (a.dia < b.dia ? -1 : 1));
+      if (d.dia === D.dia) D.diario = x;
+      D.semana = D.semana.map(s => s.dia === d.dia ? { ...s, agua: x.agua, creatina: x.creatina } : s);
+    }
   }
 
   function guardarCache() {
@@ -801,6 +846,9 @@ function revisarAjuste(pesos, meta, objetivo, hoy) {
 
   function pintar() {
     if (!D) return;
+    // Datos guardados en el móvil por una versión anterior, sin agua ni creatina.
+    D.diarios = D.diarios || [];
+    D.diario = D.diario || D.diarios.find(x => x.dia === D.dia) || { dia: D.dia, agua: 0, creatina: false };
     const sinMeta = !D.meta;
     $('nav').hidden = sinMeta;
     $('mas').hidden = sinMeta;
@@ -851,6 +899,7 @@ function revisarAjuste(pesos, meta, objetivo, hoy) {
           <div class="pista"><em style="width:${Math.min(100, t.kcal / M.kcal * 100)}%"></em></div>
           <p>${n0(t.kcal)} de ${n0(M.kcal)}${esHoy && sig && D.registro.length ? ' · falta la ' + sig[1].toLowerCase() : ''}</p></section>
         <div class="macros">${barras.map(([n, v, m, c]) => `<div class="macro"><b>${n}</b><span>${n0(v)} <small>/ ${n0(m)} g</small></span><i><em style="width:${Math.min(100, v / m * 100)}%;background:${c}"></em></i></div>`).join('')}</div>
+        ${habitosHtml()}
         ${tipHtml(t)}
         <div class="comidas">${COMIDAS.map(([id, nombre]) => {
           const it = D.registro.filter(x => x.comida === id);
@@ -891,6 +940,8 @@ function revisarAjuste(pesos, meta, objetivo, hoy) {
       const pasados = semana.filter(s => s.dia !== D.hoy && s.n);
       const mediaK = pasados.length ? promedio(pasados.map(s => s.kcal)) : 0;
       const cumplidos = pasados.filter(s => s.prot >= D.meta.prot).length;
+    const conAgua = semana.filter(s => s.agua > 0);
+    const diasCreatina = semana.filter(s => s.creatina).length;
       let ajuste;
       if (aj.estado === 'pronto') ajuste = `<p>Tu meta es del ${fecha(D.meta.dia)}. La reviso el <b>${fecha(aj.proxima)}</b> con la media de tu peso. Buscamos ${n1(obj.ritmo[0])} a ${n1(obj.ritmo[1])} kg por semana; si te sales, te propongo subir o bajar ${PASO_AJUSTE} kcal.</p>`;
       else if (aj.estado === 'faltan') ajuste = `<p>Ya toca revisar la meta, pero me faltan pesadas: necesito 3 de esta semana (llevas ${aj.ahora}) y 3 de hace dos semanas (hay ${aj.antes}). Pésate en ayunas unas mañanas.</p>`;
@@ -904,7 +955,8 @@ function revisarAjuste(pesos, meta, objetivo, hoy) {
           <p>Pésate por la mañana, en ayunas. Mira la media, no el día: el peso diario baila hasta 1 kg por agua y sal.</p></section>
         <section class="tarjeta"><span class="eti">Últimos 7 días</span>
           ${barrasSemana(semana)}
-          <p>${pasados.length ? `Media <b>${n0(mediaK)} kcal</b>${D.dia === D.hoy ? ' sin contar hoy' : ''} · proteína cumplida <b>${cumplidos} de ${pasados.length} días</b>. ` : ''}La línea es tu meta de ${n0(D.meta.kcal)} y el punto azul, la proteína cumplida.</p></section>
+          <p>${pasados.length ? `Media <b>${n0(mediaK)} kcal</b>${D.dia === D.hoy ? ' sin contar hoy' : ''} · proteína cumplida <b>${cumplidos} de ${pasados.length} días</b>. ` : ''}La línea es tu meta de ${n0(D.meta.kcal)} y el punto azul, la proteína cumplida.</p>
+          <p>Agua: ${conAgua.length ? `media <b>${litros(promedio(conAgua.map(s => s.agua)))}</b> de ${litros(metaAgua(pesoActual()))} los días que la apuntaste` : 'aún sin apuntar'} · creatina <b>${diasCreatina} de 7 días</b>${racha(D.diarios, D.hoy) > 1 ? `, racha de ${racha(D.diarios, D.hoy)}` : ''}.</p></section>
         <section class="tarjeta"><span class="eti">Ajuste cada 2 semanas</span>${ajuste}</section>
         <section class="tarjeta"><span class="eti">Tu meta diaria</span>
           <div class="objetivos">${[[n0(D.meta.kcal), 'kcal'], [n0(D.meta.prot) + ' g', 'proteína'], [n0(D.meta.carb) + ' g', 'carbos'], [n0(D.meta.grasa) + ' g', 'grasa']].map(([v, t]) => `<div><b>${v}</b><span>${t}</span></div>`).join('')}</div>
@@ -942,6 +994,25 @@ function revisarAjuste(pesos, meta, objetivo, hoy) {
     return `<div class="grupo"><span class="eti">Menús para ${OBJETIVO[objetivo()].nombre.toLowerCase()}</span>
       <div class="chips">${[['dia', 'Día completo'], ...COMIDAS].map(([v, t]) => `<button type="button" data-act="menu" data-v="${v}" aria-pressed="${v === menuSel}">${t}</button>`).join('')}</div>
       ${cuerpo}<p class="nota">Las cantidades ya están ajustadas a tu meta. Toca una receta para ver cómo se hace y apuntarla.</p></div>`;
+  }
+
+  // Agua (vasos de 250 ml hasta tu meta) y creatina (un toque al día, con racha).
+  const litros = ml => (Math.round(ml / 10) / 100).toLocaleString('es-ES', { maximumFractionDigits: 2 }) + ' L';
+  const pesoActual = () => (D.pesos[D.pesos.length - 1] || {}).kg || 70;
+  function habitosHtml() {
+    const x = D.diario;
+    const meta = metaAgua(pesoActual());
+    const vasos = Math.round(meta / 250);
+    const llenos = Math.min(vasos, Math.floor(x.agua / 250));
+    const r = racha(D.diarios, D.hoy);
+    return `<div class="habitos">
+      <section class="hab"><span class="eti">Agua</span>
+        <span class="val">${litros(x.agua)} <small>de ${litros(meta)}</small></span>
+        <div class="vasos" aria-hidden="true">${Array.from({ length: vasos }, (_, i) => `<i class="${i < llenos ? 'lleno' : ''}"></i>`).join('')}</div>
+        <div class="botones"><button data-act="agua" data-ml="250">+ vaso</button><button data-act="agua" data-ml="500">+ botella</button><button class="menos" data-act="agua" data-ml="-250" aria-label="Quitar un vaso" ${x.agua ? '' : 'disabled'}>−</button></div></section>
+      <section class="hab crea"><span class="eti">Creatina</span>
+        <button class="marca" data-act="creatina" aria-pressed="${x.creatina}">${x.creatina ? ico('ok', 16, 2.6) + ' 5 g' : 'Marcar 5 g'}</button>
+        <small>${r ? `Racha: ${r} ${r === 1 ? 'día' : 'días'}` : 'Cada día, a la hora que quieras'}</small></section></div>`;
   }
 
   // Sugerencia de proteína con tus habituales (solo hoy y si falta bastante).
@@ -1349,6 +1420,12 @@ function revisarAjuste(pesos, meta, objetivo, hoy) {
       const r = RECETAS.find(x => x.id === hoja.r);
       enviar('plato', { id: nid('p'), nombre: r.n, items: escalar(r, kcalComida(hoja.m)).map(([a, g]) => [a.id, g]) });
       avisar('Guardado en tus platos: lo tienes arriba al pulsar +');
+    },
+    agua: t => enviar('diario', { dia: D.dia, agua: Math.max(0, D.diario.agua + Number(t.dataset.ml)) }),
+    creatina: () => {
+      const si = !D.diario.creatina;
+      enviar('diario', { dia: D.dia, creatina: si });
+      if (si && D.dia === D.hoy) { const r = racha(D.diarios, D.hoy); avisar(r > 1 ? `Creatina apuntada · ${r} días seguidos` : 'Creatina apuntada'); }
     },
     copiarWidget: () => {
       const texto = codigoWidget();

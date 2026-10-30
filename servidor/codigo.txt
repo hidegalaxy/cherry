@@ -20,6 +20,8 @@ const ESQUEMA = {
   Peso: ['dia', 'kg'],
   Metas: ['dia', 'kcal', 'prot', 'carb', 'grasa', 'motivo'],
   Perfil: ['campo', 'valor'],
+  // Un día por fila: agua bebida en ml y si tomaste la creatina.
+  Diario: ['dia', 'agua', 'creatina'],
 };
 const COMIDAS = ['des', 'com', 'mer', 'cen'];
 const CAMPOS_PERFIL = ['sexo', 'edad', 'altura', 'actividad', 'objetivo'];
@@ -247,6 +249,23 @@ const ACCIONES_ = {
   },
   borrarPlato: d => { borrarDonde_('Platos', r => String(r.id) === d.id); return 'Plato borrado'; },
 
+  // { dia, agua?, creatina? }: valores totales del día (no sumas), así reintentar no cuenta dos veces.
+  diario: d => {
+    const dia = diaValido_(d.dia);
+    if (!dia) throw new Error('Falta el día');
+    const cambios = {};
+    if (d.agua != null) {
+      const ml = Math.round(numero_(d.agua));
+      if (!(ml >= 0 && ml <= 10000)) throw new Error('Agua no válida');
+      cambios.agua = ml;
+    }
+    if (d.creatina != null) cambios.creatina = d.creatina ? 1 : 0;
+    const fila = leer_('Diario').find(r => diaTexto_(r.dia) === dia);
+    if (fila) actualizar_('Diario', fila._fila, cambios);
+    else anadir_('Diario', Object.assign({ dia, agua: 0, creatina: 0 }, cambios));
+    return 'Guardado';
+  },
+
   // { dia, kg }: un peso por día; el último que apuntas manda.
   peso: d => {
     const dia = diaValido_(d.dia);
@@ -297,12 +316,19 @@ function datos_(dia) {
     gramos: Number(r.gramos), kcal: Number(r.kcal), prot: Number(r.prot), carb: Number(r.carb), grasa: Number(r.grasa),
   }));
 
+  // Agua y creatina de los últimos 60 días (para la racha y la semana).
+  const desdeDiario = diaMas_(hoy, -DIAS_PESO);
+  const diarios = leer_('Diario').map(r => ({ dia: diaTexto_(r.dia), agua: Number(r.agua) || 0, creatina: !!Number(r.creatina) }))
+    .filter(x => x.dia >= desdeDiario).sort((a, b) => (a.dia < b.dia ? -1 : 1));
+  const diarioDe = d => diarios.find(x => x.dia === d) || { dia: d, agua: 0, creatina: false };
+
   // Totales de los 7 días que acaban en el día que se mira.
   const semana = [];
   for (let i = 6; i >= 0; i--) {
     const d = diaMas_(dia, -i);
     const es = registro.filter(r => r.dia === d);
-    semana.push({ dia: d, kcal: Math.round(es.reduce((a, r) => a + r.kcal, 0)), prot: Math.round(es.reduce((a, r) => a + r.prot, 0)), n: es.length });
+    const x = diarioDe(d);
+    semana.push({ dia: d, kcal: Math.round(es.reduce((a, r) => a + r.kcal, 0)), prot: Math.round(es.reduce((a, r) => a + r.prot, 0)), n: es.length, agua: x.agua, creatina: x.creatina });
   }
 
   // Habituales: lo que más has comido en los últimos 30 días, con la última cantidad que pusiste.
@@ -343,7 +369,16 @@ function datos_(dia) {
     perfil,
     meta: metas.length ? metas[metas.length - 1] : null,
     metas: metas.slice(-6),
+    diario: diarioDe(dia),
+    diarios,
   };
+}
+
+// Meta de agua: 35 ml por kg, de 250 en 250 (la misma cuenta que metaAgua en la app).
+function metaAgua_() {
+  const pesos = leer_('Peso').map(r => ({ dia: diaTexto_(r.dia), kg: Number(r.kg) })).filter(p => p.kg > 0).sort((a, b) => (a.dia < b.dia ? -1 : 1));
+  const kg = pesos.length ? pesos[pesos.length - 1].kg : 70;
+  return Math.round(kg * 35 / 250) * 250;
 }
 
 // Totales de hoy contra la meta. El widget se refresca solo cada ~15 min: cuanto menos lea, mejor.
@@ -355,7 +390,11 @@ function widget_() {
     .sort((a, b) => (a.dia < b.dia ? -1 : 1));
   const comidas = {};
   COMIDAS.forEach(c => { comidas[c] = es.some(r => r.comida === c); });
-  return { hoy, kcal: sum('kcal'), prot: sum('prot'), carb: sum('carb'), grasa: sum('grasa'), meta: metas.length ? metas[metas.length - 1] : null, comidas };
+  const diario = leer_('Diario').find(r => diaTexto_(r.dia) === hoy);
+  return {
+    hoy, kcal: sum('kcal'), prot: sum('prot'), carb: sum('carb'), grasa: sum('grasa'), meta: metas.length ? metas[metas.length - 1] : null, comidas,
+    agua: diario ? Number(diario.agua) || 0 : 0, metaAgua: metaAgua_(), creatina: !!(diario && Number(diario.creatina)),
+  };
 }
 
 // ---------- Hoja ----------
@@ -371,8 +410,15 @@ function libro_() {
   return LIBRO_;
 }
 
+// Si falta una pestaña del esquema (p. ej. Diario al actualizar el código), se crea sola con su cabecera.
 function hoja_(nombre) {
-  const h = libro_().getSheetByName(nombre);
+  const ss = libro_();
+  let h = ss.getSheetByName(nombre);
+  if (!h && ESQUEMA[nombre]) {
+    h = ss.insertSheet(nombre);
+    h.getRange(1, 1, 1, ESQUEMA[nombre].length).setValues([ESQUEMA[nombre]]);
+    h.setFrozenRows(1);
+  }
   if (!h) throw new Error('Falta la pestaña ' + nombre + ': ejecuta configurar()');
   return h;
 }
