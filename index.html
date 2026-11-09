@@ -1168,7 +1168,8 @@ function racha(diarios, hoy) {
         <div id="lector"><div class="marco"></div></div>
         <p class="nota" id="scanNota">Apunta al código de barras del envase. La primera vez, el móvil te pedirá permiso para la cámara.</p>
         <form class="linea2" data-form="codigo"><input class="campo" id="codigoMano" inputmode="numeric" placeholder="O escribe el número del código" autocomplete="off" aria-label="Número del código de barras"><button class="btn">Buscar</button></form>
-        <button class="btn sec ancho" data-act="volver">Cancelar</button></div>`;
+        <button class="btn sec ancho" data-act="volver">Cancelar</button>
+        <p class="nota" style="text-align:center;opacity:.5;font-size:12px">Lector 2 · versión ${VERSION}</p></div>`;
     } else if (H.modo === 'alimento') {
       const a = H.a || {};
       const v = x => x == null || x === '' ? '' : esc(String(x).replace('.', ','));
@@ -1293,6 +1294,19 @@ function racha(diarios, hoy) {
   // Se prepara en segundo plano al abrir la app, para que la primera vez el escáner ya esté listo.
   setTimeout(() => detector().catch(() => {}), 2500);
 
+  // Versión de la app: si en GitHub hay una más nueva que la que guardó el iPhone, se recarga sola.
+  const VERSION = '2026-11-09b';
+  if (/github\.io$/.test(location.hostname)) setTimeout(async () => {
+    try {
+      const t = await (await fetch(location.pathname + '?comprobar=' + Date.now(), { cache: 'no-store' })).text();
+      const v = (t.match(/const VERSION = '([^']+)'/) || [])[1];
+      if (v && v !== VERSION && sessionStorage.getItem('cherry.recargada') !== v) {
+        sessionStorage.setItem('cherry.recargada', v);
+        location.replace(location.pathname + '?v=' + v);
+      }
+    } catch (e) {}
+  }, 1200);
+
   function controlOk(c, formato) {
     if (formato === 'upc_e') return c.length === 8;
     if (![8, 12, 13].includes(c.length)) return false;
@@ -1389,7 +1403,8 @@ function racha(diarios, hoy) {
   }
   async function porCodigo(codigo) {
     codigo = String(codigo).replace(/\D/g, '');
-    if (codigo.length < 8) return avisar('Ese código es demasiado corto');
+    if (!codigo) return avisar('Escribe el número que hay debajo de las barras');
+    if (codigo.length < 8) return avisar('«' + codigo + '» es corto: un código de barras tiene 8 o 13 cifras');
     const ya = D.alimentos.find(a => a.codigo === codigo);
     if (ya) return abrirRacion(ya, ya.gUnidad || 100);
     if ($('scanNota')) $('scanNota').textContent = 'Buscando ' + codigo + ' en Open Food Facts…';
