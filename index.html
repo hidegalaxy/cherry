@@ -1331,7 +1331,7 @@ function racha(diarios, hoy) {
         html = `<form class="hoja alta" data-form="foto">${cabH(r.plato || 'Tu plato')}${cab}
           ${r.comentario ? `<p class="nota">${esc(r.comentario)}</p>` : ''}
           <span class="eti">Ingredientes · confianza ${esc(r.confianza || 'media')}</span>
-          <div class="lista">${H.items.map((x, i) => x.quitado ? '' : `<div class="ing"><div class="txt"><b>${esc(x.a.nombre)}</b><small id="fk${i}">${n0(macros(x.a, x.g).kcal)} kcal · P ${n1(macros(x.a, x.g).prot)}</small></div>
+          <div class="lista">${H.items.map((x, i) => x.quitado ? '' : `<div class="ing"><div class="txt"><b>${esc(x.n || x.a.nombre)}</b><small id="fk${i}">${n0(macros(x.a, x.g).kcal)} kcal · P ${n1(macros(x.a, x.g).prot)}</small>${x.a.fuente === 'base' && x.n && x.n !== x.a.nombre ? `<small>tabla: ${esc(x.a.nombre)}</small>` : ''}</div>
             <label><input id="fg${i}" inputmode="numeric" value="${x.g || ''}" aria-label="Gramos de ${esc(x.a.nombre)}" autocomplete="off"><span>g</span></label>
             <button type="button" class="quitar" data-act="quitarIng" data-i="${i}" aria-label="Quitar ${esc(x.a.nombre)}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>`).join('')}</div>
           <div class="total" id="totalFoto">${totalHtml(tot)}</div>
@@ -1439,7 +1439,7 @@ function racha(diarios, hoy) {
   setTimeout(() => detector().catch(() => {}), 2500);
 
   // Versión de la app: si en GitHub hay una más nueva que la que guardó el iPhone, se recarga sola.
-  const VERSION = '2026-11-11b';
+  const VERSION = '2026-11-11c';
   if (/github\.io$/.test(location.hostname)) setTimeout(async () => {
     try {
       const t = await (await fetch(location.pathname + '?comprobar=' + Date.now(), { cache: 'no-store' })).text();
@@ -1572,8 +1572,9 @@ function racha(diarios, hoy) {
 
   // ---------- Apuntar ----------
 
-  function apuntar(items, comida, texto) {
-    const lista = items.map(([a, g]) => entrada(a, g));
+  // ids: los de las entradas, si vienen dados (las de una foto llevan «q<foto>-<fila>» para que el PC aprenda de tus gramos).
+  function apuntar(items, comida, texto, ids) {
+    const lista = items.map(([a, g], i) => ({ ...entrada(a, g), ...(ids ? { id: ids[i] } : {}) }));
     enviar('apuntar', { dia: D.dia, comida, items: lista });
     cerrarHoja();
     if (vista !== 'today') { vista = 'today'; guardarVista(); pintar(); }
@@ -1684,7 +1685,7 @@ function racha(diarios, hoy) {
     verFoto: t => {
       const f = D.fotos.find(x => x.id === t.dataset.id);
       if (!f) return;
-      const items = f.estado === 'leida' && f.resultado ? f.resultado.items.map(x => ({ a: deFoto(x), g: Math.round(x.gramos) })) : [];
+      const items = f.estado === 'leida' && f.resultado ? f.resultado.items.map(x => ({ a: deFoto(x), g: Math.round(x.gramos), n: x.nombre })) : [];
       abrirHoja({ modo: 'foto', id: f.id, m: COMIDAS.some(c => c[0] === f.comida) ? f.comida : siguienteComida(), items });
     },
     fotoChip: t => { const g = t.dataset.g; hoja[g] = hoja[g] === t.dataset.v ? '' : t.dataset.v; pintarHoja(); },
@@ -1823,11 +1824,11 @@ function racha(diarios, hoy) {
       avisar('Foto enviada: Claude la leerá cuando tu PC mire');
     }
     if (f === 'foto') {
-      const items = itemsFoto(hoja);
-      if (!items.length) return avisar('No queda ningún ingrediente con gramos');
+      const filas = hoja.items.map((x, i) => [x, i]).filter(([x]) => x.g > 0);
+      if (!filas.length) return avisar('No queda ningún ingrediente con gramos');
       const fo = D.fotos.find(x => x.id === hoja.id);
       const id = hoja.id;
-      apuntar(items, hoja.m, `Añadido «${(fo && fo.resultado && fo.resultado.plato) || 'tu plato'}»`);
+      apuntar(filas.map(([x]) => [x.a, x.g]), hoja.m, `Añadido «${(fo && fo.resultado && fo.resultado.plato) || 'tu plato'}»`, filas.map(([, i]) => 'q' + id.slice(1) + '-' + i));
       enviar('quitarFoto', { id });
     }
     if (f === 'releer') {
