@@ -1067,7 +1067,10 @@ function racha(diarios, hoy) {
     if (!conFotos() || !D.fotos.length || D.dia !== D.hoy) return '';
     return `<section class="fotos"><span class="eti">Fotos del plato</span><div class="lista">${D.fotos.map(f => {
       const [cl, txt] = estadoFoto(f);
-      const titulo = (f.resultado && f.resultado.plato) || f.nota || 'Plato';
+      // Sin los botones rápidos delante: «Restaurante · frito · Pollo con patatas» → «Pollo con patatas».
+      const chips = FOTO_CHIPS.flatMap(c => c[2]).map(v => v.toLowerCase());
+      const texto = f.nota.split(' · ').filter(p => !chips.includes(p.toLowerCase())).join(' · ');
+      const titulo = (f.resultado && f.resultado.plato) || texto || f.nota || 'Plato';
       return `<div class="ali">${f.mini ? `<img class="fotoMini" src="${esc(f.mini)}" alt="">` : `<span class="fotoMini"></span>`}
         <button class="txt" data-act="verFoto" data-id="${esc(f.id)}"><b>${esc(titulo)}</b><small class="${cl}">${esc(txt)}</small></button></div>`;
     }).join('')}</div></section>`;
@@ -1077,7 +1080,9 @@ function racha(diarios, hoy) {
     const b = x.base && BASE[x.base] ? alimento('b:' + x.base) : null;
     return b || { id: '', nombre: x.nombre, kcal: x.kcal, prot: x.prot, carb: x.carb, grasa: x.grasa, unidad: '', gUnidad: 0, ml: false, fuente: 'foto' };
   }
-  const itemsFoto = H => H.items.filter(x => x.g > 0).map(x => [x.a, x.g]);
+  // Botones rápidos de la foto nueva: dónde se hizo y cómo está cocinado (lo que más cambia el aceite y la ración).
+  const FOTO_CHIPS = [['donde', '¿De dónde es?', ['Casa', 'Restaurante', 'Tupper']], ['como', '¿Cómo está hecho?', ['Plancha', 'Frito', 'Guisado', 'Horno', 'Crudo']]];
+  const itemsFoto = H =>H.items.filter(x => x.g > 0).map(x => [x.a, x.g]);
 
   // La foto se comprime en el móvil antes de subirla: una de 5 MB se queda en unos 300 KB.
   function comprimirFoto(file) {
@@ -1309,8 +1314,10 @@ function racha(diarios, hoy) {
         <button class="btn sec ancho" data-act="cerrar">Cerrar</button></div>`;
     } else if (H.modo === 'fotoNueva') {
       html = `<form class="hoja" data-form="fotoNueva">${cabH('Foto del plato')}
-        <img class="fotoGrande" src="${esc(H.foto)}" alt="Tu plato">
-        <label class="camp"><span>¿Algo que no se vea? (opcional)</span><textarea class="campo" id="fotoNota" rows="2" placeholder="«200 g de arroz», «frito con aceite», «la salsa es nata»…">${esc(H.nota || '')}</textarea></label>
+        <img class="fotoGrande" src="${esc(H.foto)}" alt="Tu plato" style="max-height:190px">
+        <label class="camp"><span>¿Qué es? Cuéntaselo a Claude (recomendado)</span><textarea class="campo" id="fotoNota" rows="2" placeholder="«Lentejas con chorizo, un plato hondo lleno», «200 g de arroz y una pechuga»…">${esc(H.nota || '')}</textarea></label>
+        <p class="nota" style="margin-top:-8px">Puedes dictarlo con el micro del teclado. Lo que le digas manda sobre lo que él vea.</p>
+        ${FOTO_CHIPS.map(([g, t, ops]) => `<span class="eti">${t}</span><div class="chips">${ops.map(v => `<button type="button" data-act="fotoChip" data-g="${g}" data-v="${v}" aria-pressed="${H[g] === v}">${v}</button>`).join('')}</div>`).join('')}
         <span class="eti">¿En qué comida?</span>${chipsComida(H.m)}
         <p class="nota">Claude la lee en tu PC (mira cada 30 min) y te deja los ingredientes con sus gramos para que los revises. Un tenedor o tu mano al lado le ayudan a calcular la cantidad.</p>
         <div class="fila"><button class="btn" style="flex:1">Enviar</button><button type="button" class="btn sec" data-act="volver">Volver</button></div></form>`;
@@ -1432,7 +1439,7 @@ function racha(diarios, hoy) {
   setTimeout(() => detector().catch(() => {}), 2500);
 
   // Versión de la app: si en GitHub hay una más nueva que la que guardó el iPhone, se recarga sola.
-  const VERSION = '2026-11-11a';
+  const VERSION = '2026-11-11b';
   if (/github\.io$/.test(location.hostname)) setTimeout(async () => {
     try {
       const t = await (await fetch(location.pathname + '?comprobar=' + Date.now(), { cache: 'no-store' })).text();
@@ -1680,6 +1687,7 @@ function racha(diarios, hoy) {
       const items = f.estado === 'leida' && f.resultado ? f.resultado.items.map(x => ({ a: deFoto(x), g: Math.round(x.gramos) })) : [];
       abrirHoja({ modo: 'foto', id: f.id, m: COMIDAS.some(c => c[0] === f.comida) ? f.comida : siguienteComida(), items });
     },
+    fotoChip: t => { const g = t.dataset.g; hoja[g] = hoja[g] === t.dataset.v ? '' : t.dataset.v; pintarHoja(); },
     quitarIng: t => { hoja.items[+t.dataset.i].quitado = true; hoja.items[+t.dataset.i].g = 0; pintarHoja(); },
     quitarFoto: t => {
       if (!seguro(t)) return;
@@ -1806,7 +1814,9 @@ function racha(diarios, hoy) {
     }
     if (f === 'codigo') porCodigo($('codigoMano').value);
     if (f === 'fotoNueva') {
-      const d = { id: nid('f'), dia: D.dia, comida: hoja.m, foto: hoja.foto, mini: hoja.mini, nota: $('fotoNota').value.trim().slice(0, 200) };
+      // Los botones rápidos van delante del texto: «Restaurante · Frito · lo que escribas».
+      const nota = [hoja.donde, hoja.como && hoja.como.toLowerCase(), $('fotoNota').value.trim()].filter(Boolean).join(' · ').slice(0, 200);
+      const d = { id: nid('f'), dia: D.dia, comida: hoja.m, foto: hoja.foto, mini: hoja.mini, nota };
       enviar('foto', d);
       cerrarHoja();
       if (vista !== 'today') { vista = 'today'; guardarVista(); pintar(); }
