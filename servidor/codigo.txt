@@ -7,6 +7,9 @@
  *
  * La app vive en GitHub Pages (WEB) y habla con este servidor por fetch:
  * GET ?accion=datos&k=CLAVE[&dia=yyyy-mm-dd] y POST { api: 'accion', k, que, d, dia }.
+ *
+ * Fotos del plato: la app sube la foto a la carpeta «Cherry - Fotos» de tu Drive y el lector del PC
+ * (lector-pc/cherry_fotos.py, cada 30 min) la lee con Claude Code y deja los ingredientes «por revisar».
  */
 
 const TZ = 'Europe/Madrid';
@@ -22,6 +25,8 @@ const ESQUEMA = {
   Perfil: ['campo', 'valor'],
   // Un día por fila: agua bebida en ml y si tomaste la creatina.
   Diario: ['dia', 'agua', 'creatina'],
+  // Fotos del plato. estado: '' por leer · 'leida' lista para revisar · 'ilegible'. Al apuntarla o quitarla se borra la fila.
+  Fotos: ['id', 'dia', 'comida', 'archivo', 'nota', 'estado', 'mini', 'resultado', 'creado'],
 };
 const COMIDAS = ['des', 'com', 'mer', 'cen'];
 const CAMPOS_PERFIL = ['sexo', 'edad', 'altura', 'actividad', 'objetivo'];
@@ -60,14 +65,19 @@ function configurar() {
   if (!props.getProperty('CLAVE')) {
     props.setProperty('CLAVE', Utilities.getUuid().replace(/-/g, '').slice(0, 16));
   }
+  carpetaFotos_();
   Logger.log('Hoja: ' + ss.getUrl());
   Logger.log('Clave: ' + props.getProperty('CLAVE'));
+  const exec = ScriptApp.getService().getUrl();
+  if (exec) Logger.log('Dirección para el lector de fotos del PC: ' + exec + '?k=' + props.getProperty('CLAVE'));
 }
 
 // ---------- Web ----------
 
 // GET ?k=CLAVE&accion=datos[&dia=]  → datos de la app en JSON
 // GET ?k=CLAVE&accion=widget         → lo de hoy en pocos números, para el widget de Scriptable
+// GET ?k=CLAVE&accion=pendientes     → fotos del plato por leer, para el lector del PC
+// GET ?k=CLAVE&accion=foto&id=ID     → la foto en JSON, para el lector del PC
 // GET (sin clave) o ?accion=instalar → página con el QR para abrir Cherry en el iPhone
 function doGet(e) {
   const p = e.parameter;
@@ -75,6 +85,14 @@ function doGet(e) {
     try {
       comprobar_(p.k);
       return json_(widget_());
+    } catch (err) {
+      return json_({ error: err.message });
+    }
+  }
+  if (p.accion === 'pendientes' || p.accion === 'foto') {
+    try {
+      comprobar_(p.k);
+      return json_(p.accion === 'foto' ? fotoPc_(p.id) : pendientesPc_());
     } catch (err) {
       return json_({ error: err.message });
     }
@@ -293,6 +311,57 @@ const ACCIONES_ = {
     if (d.meta) ACCIONES_.meta(Object.assign({ motivo: 'tus datos' }, d.meta));
     return 'Datos guardados';
   },
+
+  // { id, dia, comida, foto, mini, nota }: foto y mini llegan del móvil ya comprimidas (data:image/jpeg;base64).
+  foto: d => {
+    const id = idValido_(d.id) || nuevoId_('f');
+    if (leer_('Fotos').some(r => String(r.id) === id)) return 'Foto subida'; // reintento
+    const dia = diaValido_(d.dia) || hoy_();
+    const m = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/.exec(String(d.foto || ''));
+    if (!m) throw new Error('Esa imagen no se puede guardar');
+    if (m[2].length > 14000000) throw new Error('La foto es demasiado grande');
+    const nota = String(d.nota || '').trim().slice(0, 200);
+    const nombre = dia + ' ' + (nota || 'plato').replace(/[\\/:*?"<>|']/g, ' ').slice(0, 50) + '.' + (m[1] === 'jpeg' ? 'jpg' : m[1]);
+    const archivo = carpetaFotos_().createFile(Utilities.newBlob(Utilities.base64Decode(m[2]), 'image/' + m[1], nombre));
+    anadir_('Fotos', {
+      id, dia, comida: COMIDAS.indexOf(d.comida) >= 0 ? d.comida : '', archivo: archivo.getId(), nota, estado: '',
+      mini: /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(String(d.mini || '')) && String(d.mini).length < 45000 ? d.mini : '',
+      resultado: '', creado: new Date(),
+    });
+    return 'Foto subida: Claude la leerá cuando tu PC mire (cada 30 min)';
+  },
+  // Del lector del PC: { id, ilegible, comentario } o { id, plato, comentario, confianza, items: [{ nombre, base, gramos, kcal, prot, carb, grasa }] } (macros por 100 g).
+  leidaFoto: d => {
+    const fila = leer_('Fotos').find(r => String(r.id) === d.id);
+    if (!fila) return 'Esa foto ya no está';
+    const items = [].concat(d.items || []).map(x => ({
+      nombre: String(x.nombre || '').trim().slice(0, 60), base: String(x.base || '').replace(/\W/g, '').slice(0, 30), gramos: redondear_(numero_(x.gramos), 0),
+      kcal: redondear_(numero_(x.kcal), 0), prot: redondear_(numero_(x.prot), 1), carb: redondear_(numero_(x.carb), 1), grasa: redondear_(numero_(x.grasa), 1),
+    })).filter(x => x.nombre && x.gramos > 0 && x.gramos <= 3000 && x.kcal >= 0 && x.kcal <= 950).slice(0, 20);
+    const comentario = String(d.comentario || '').trim().slice(0, 300);
+    if (d.ilegible || !items.length) {
+      actualizar_('Fotos', fila._fila, { estado: 'ilegible', resultado: JSON.stringify({ comentario }) });
+      return 'Foto ilegible';
+    }
+    const resultado = { plato: String(d.plato || '').trim().slice(0, 60), comentario, confianza: ['alta', 'media', 'baja'].indexOf(d.confianza) >= 0 ? d.confianza : 'media', items };
+    actualizar_('Fotos', fila._fila, { estado: 'leida', resultado: JSON.stringify(resultado) });
+    return 'Foto leída';
+  },
+  // { id, nota }: vuelve a dejarla por leer, con la nota nueva (p. ej. tras «no se ve bien»).
+  releerFoto: d => {
+    const fila = leer_('Fotos').find(r => String(r.id) === d.id);
+    if (!fila) throw new Error('Esa foto ya no está');
+    actualizar_('Fotos', fila._fila, { estado: '', resultado: '', nota: d.nota != null ? String(d.nota).trim().slice(0, 200) : String(fila.nota || '') });
+    return 'La vuelvo a leer en la próxima pasada';
+  },
+  // Tras apuntarla o al descartarla. La foto va a la papelera de Drive (30 días para recuperarla).
+  quitarFoto: d => {
+    leer_('Fotos').filter(r => String(r.id) === d.id).forEach(r => {
+      try { DriveApp.getFileById(String(r.archivo)).setTrashed(true); } catch (err) {}
+    });
+    borrarDonde_('Fotos', r => String(r.id) === d.id);
+    return 'Foto quitada';
+  },
   // { kcal, prot, carb, grasa, motivo }: cada cambio queda como una fila, así se ve la historia de ajustes.
   meta: d => {
     const m = { kcal: numero_(d.kcal), prot: numero_(d.prot), carb: numero_(d.carb), grasa: numero_(d.grasa) };
@@ -371,7 +440,44 @@ function datos_(dia) {
     metas: metas.slice(-6),
     diario: diarioDe(dia),
     diarios,
+    // Que exista la lista le dice a la app que este servidor ya sabe de fotos.
+    fotos: leer_('Fotos').map(r => {
+      let resultado = null;
+      try { resultado = r.resultado ? JSON.parse(r.resultado) : null; } catch (e) {}
+      return { id: String(r.id), dia: diaTexto_(r.dia), comida: String(r.comida || ''), nota: String(r.nota || '').replace(/^'/, ''), estado: String(r.estado || ''), mini: String(r.mini || ''), resultado };
+    }),
+    pcVisto: PropertiesService.getScriptProperties().getProperty('PC_VISTO') || '',
   };
+}
+
+// ---------- Fotos del plato ----------
+
+// Carpeta privada de Drive. Si la han borrado o viene de la copia de otra persona, se crea otra.
+function carpetaFotos_() {
+  const props = PropertiesService.getScriptProperties();
+  const id = props.getProperty('CARPETA_FOTOS');
+  if (id) {
+    try {
+      const c = DriveApp.getFolderById(id);
+      if (!c.isTrashed()) return c;
+    } catch (err) {}
+  }
+  const nueva = DriveApp.createFolder('Cherry - Fotos');
+  props.setProperty('CARPETA_FOTOS', nueva.getId());
+  return nueva;
+}
+
+// Lo que necesita el lector del PC. De paso, deja constancia de que el PC sigue mirando.
+function pendientesPc_() {
+  PropertiesService.getScriptProperties().setProperty('PC_VISTO', new Date().toISOString());
+  return { hoy: hoy_(), pendientes: leer_('Fotos').filter(r => !String(r.estado || '')).map(r => ({ id: String(r.id), nota: String(r.nota || '').replace(/^'/, ''), comida: String(r.comida || '') })) };
+}
+
+function fotoPc_(id) {
+  const r = leer_('Fotos').find(x => String(x.id) === String(id));
+  if (!r) throw new Error('Esa foto ya no está');
+  const blob = DriveApp.getFileById(String(r.archivo)).getBlob();
+  return { foto: 'data:' + blob.getContentType() + ';base64,' + Utilities.base64Encode(blob.getBytes()) };
 }
 
 // Meta de agua: 35 ml por kg, de 250 en 250 (la misma cuenta que metaAgua en la app).

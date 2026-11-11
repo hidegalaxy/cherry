@@ -37,7 +37,7 @@
   [hidden] { display: none !important; }
   html, body { height: 100%; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.4 var(--font); overscroll-behavior: none; }
-  button, input { font: inherit; color: inherit; }
+  button, input, textarea { font: inherit; color: inherit; }
   button { cursor: pointer; }
   :focus-visible { outline: 2px solid var(--cherry); outline-offset: 2px; }
 
@@ -225,6 +225,28 @@
   .crea button.marca { width: 100%; height: 44px; border-radius: 13px; border: 1px dashed var(--track); background: none; color: var(--muted); font-weight: 700; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 6px; }
   .crea button.marca[aria-pressed="true"] { background: var(--fat); border: 1px solid var(--fat); color: var(--ink); }
   .crea small { font-size: 12px; color: var(--muted); }
+
+  /* Fotos del plato */
+  .oculto { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+  .fotoBtn { position: relative; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; }
+  .fotos { background: var(--surface); border: 1px solid var(--line); border-radius: 22px; padding: 14px 16px 6px; display: flex; flex-direction: column; }
+  .fotos .ali .txt small.listo { color: var(--fat); }
+  .fotos .ali .txt small.mal { color: var(--car); }
+  .fotoMini { width: 46px; height: 46px; border-radius: 12px; object-fit: cover; background: var(--track); flex: 0 0 46px; }
+  .fotoGrande { width: 100%; max-height: 260px; object-fit: cover; border-radius: 18px; background: var(--track); }
+  .fotoCab { display: flex; gap: 12px; align-items: center; }
+  .fotoCab .fotoMini { width: 64px; height: 64px; flex-basis: 64px; border-radius: 14px; }
+  .fotoCab p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.45; }
+  .ing { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .ing:last-child { border-bottom: 0; }
+  .ing .txt { flex: 1; min-width: 0; }
+  .ing .txt b { display: block; font-weight: 600; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ing .txt small { display: block; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .ing label { display: flex; align-items: baseline; gap: 3px; height: 40px; padding: 0 10px; border-radius: 12px; border: 1px solid var(--track); background: var(--bg); flex: 0 0 auto; }
+  .ing input { width: 46px; border: 0; background: none; outline: none; text-align: right; font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; padding-top: 9px; }
+  .ing label span { font-size: 13px; color: var(--muted); }
+  .ing .quitar { width: 32px; height: 32px; border-radius: 10px; border: 0; background: none; color: var(--dim); display: grid; place-items: center; flex: 0 0 32px; }
+  textarea.campo { height: auto; min-height: 70px; padding: 12px 14px; resize: none; line-height: 1.4; }
 
   /* Menús */
   .receta-nota { margin: -6px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
@@ -435,6 +457,7 @@ function racha(diarios, hoy) {
     izq: '<path d="M15 6l-6 6 6 6"/>',
     der: '<path d="M9 6l6 6-6 6"/>',
     ok: '<path d="M5 12l5 5 9-10"/>',
+    foto: '<path d="M4 8a2 2 0 0 1 2-2h2l1.5-2h5L16 6h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><circle cx="12" cy="12.5" r="3.5"/>',
   };
   const ico = (n, s = 20, w = 2) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONOS[n]}</svg>`;
   const TABS = [['today', 'Today'], ['foods', 'Foods'], ['progress', 'Progress']];
@@ -719,6 +742,9 @@ function racha(diarios, hoy) {
       if (d.meta) D.meta = { ...d.meta, dia: D.hoy, motivo: 'tus datos' };
     }
     if (que === 'meta') D.meta = { ...d, dia: D.hoy };
+    if (que === 'foto' && D.fotos) D.fotos = D.fotos.filter(x => x.id !== d.id).concat({ id: d.id, dia: d.dia, comida: d.comida, nota: d.nota, estado: '', mini: d.mini, resultado: null, subiendo: true });
+    if (que === 'quitarFoto' && D.fotos) D.fotos = D.fotos.filter(x => x.id !== d.id);
+    if (que === 'releerFoto' && D.fotos) D.fotos = D.fotos.map(x => x.id === d.id ? { ...x, estado: '', resultado: null, nota: d.nota != null ? d.nota : x.nota } : x);
     if (que === 'diario') {
       const x = { ...(D.diarios.find(y => y.dia === d.dia) || { dia: d.dia, agua: 0, creatina: false }) };
       if (d.agua != null) x.agua = d.agua;
@@ -901,6 +927,7 @@ function racha(diarios, hoy) {
           <div class="pista"><em style="width:${Math.min(100, t.kcal / M.kcal * 100)}%"></em></div>
           <p>${n0(t.kcal)} de ${n0(M.kcal)}${esHoy && sig && D.registro.length ? ' · falta la ' + sig[1].toLowerCase() : ''}</p></section>
         <div class="macros">${barras.map(([n, v, m, c]) => `<div class="macro"><b>${n}</b><span>${n0(v)} <small>/ ${n0(m)} g</small></span><i><em style="width:${Math.min(100, v / m * 100)}%;background:${c}"></em></i></div>`).join('')}</div>
+        ${fotosHtml()}
         ${habitosHtml()}
         ${tipHtml(t)}
         <div class="comidas">${COMIDAS.map(([id, nombre]) => {
@@ -1015,6 +1042,78 @@ function racha(diarios, hoy) {
       <section class="hab crea"><span class="eti">Creatina</span>
         <button class="marca" data-act="creatina" aria-pressed="${x.creatina}">${x.creatina ? ico('ok', 16, 2.6) + ' 5 g' : 'Marcar 5 g'}</button>
         <small>${r ? `Racha: ${r} ${r === 1 ? 'día' : 'días'}` : 'Cada día, a la hora que quieras'}</small></section></div>`;
+  }
+
+  // ---------- Fotos del plato ----------
+
+  // Las fotos que esperan (de cualquier día) salen en Today, arriba de todo, hasta que las apuntas o las quitas.
+  const conFotos = () => !!D && Array.isArray(D.fotos);
+  function hace(iso) {
+    const min = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+    if (!(min >= 0)) return '';
+    if (min < 60) return 'hace ' + Math.max(1, min) + ' min';
+    if (min < 48 * 60) return 'hace ' + Math.round(min / 60) + ' h';
+    return 'hace ' + Math.round(min / 1440) + ' días';
+  }
+  function estadoFoto(f) {
+    if (f.subiendo) return ['', 'Subiendo…'];
+    if (f.estado === 'leida') return ['listo', 'Lista · toca para revisar'];
+    if (f.estado === 'ilegible') return ['mal', 'No se ve bien · toca para ver'];
+    // Si el PC lleva más de una hora sin mirar, seguramente está apagado.
+    const visto = D.pcVisto && Date.now() - new Date(D.pcVisto).getTime() < 65 * 60000;
+    return ['', visto || !D.pcVisto ? 'Por leer · tu PC mira cada 30 min' : 'Por leer · el PC no mira desde ' + hace(D.pcVisto) + '; ¿está apagado?'];
+  }
+  function fotosHtml() {
+    if (!conFotos() || !D.fotos.length || D.dia !== D.hoy) return '';
+    return `<section class="fotos"><span class="eti">Fotos del plato</span><div class="lista">${D.fotos.map(f => {
+      const [cl, txt] = estadoFoto(f);
+      const titulo = (f.resultado && f.resultado.plato) || f.nota || 'Plato';
+      return `<div class="ali">${f.mini ? `<img class="fotoMini" src="${esc(f.mini)}" alt="">` : `<span class="fotoMini"></span>`}
+        <button class="txt" data-act="verFoto" data-id="${esc(f.id)}"><b>${esc(titulo)}</b><small class="${cl}">${esc(txt)}</small></button></div>`;
+    }).join('')}</div></section>`;
+  }
+  // Un ingrediente leído de la foto como alimento: si Claude lo ha encontrado en la tabla, con los valores de la tabla.
+  function deFoto(x) {
+    const b = x.base && BASE[x.base] ? alimento('b:' + x.base) : null;
+    return b || { id: '', nombre: x.nombre, kcal: x.kcal, prot: x.prot, carb: x.carb, grasa: x.grasa, unidad: '', gUnidad: 0, ml: false, fuente: 'foto' };
+  }
+  const itemsFoto = H => H.items.filter(x => x.g > 0).map(x => [x.a, x.g]);
+
+  // La foto se comprime en el móvil antes de subirla: una de 5 MB se queda en unos 300 KB.
+  function comprimirFoto(file) {
+    return new Promise((ok, ko) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const lienzo = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return [c, c.getContext('2d')]; };
+        const iw = img.naturalWidth, ih = img.naturalHeight;
+        const k = Math.min(1, 1600 / Math.max(iw, ih));
+        const [c, g] = lienzo(Math.round(iw * k), Math.round(ih * k));
+        g.drawImage(img, 0, 0, c.width, c.height);
+        // Miniatura cuadrada del centro, que es donde suele estar el plato.
+        const lado = Math.min(iw, ih);
+        const [cm, gm] = lienzo(140, 140);
+        gm.drawImage(img, (iw - lado) / 2, (ih - lado) / 2, lado, lado, 0, 0, 140, 140);
+        ok({ foto: c.toDataURL('image/jpeg', 0.72), mini: cm.toDataURL('image/jpeg', 0.6) });
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); ko(new Error('imagen')); };
+      img.src = url;
+    });
+  }
+  async function elegirFoto(input) {
+    const file = input.files && input.files[0];
+    input.value = '';
+    if (!file || !hoja) return;
+    const m = hoja.m;
+    cargando(true);
+    try {
+      const f = await comprimirFoto(file);
+      abrirHoja({ modo: 'fotoNueva', m, foto: f.foto, mini: f.mini, nota: '' });
+    } catch (e) {
+      avisar('No he podido leer esa imagen');
+    }
+    cargando(false);
   }
 
   // Sugerencia de proteína con tus habituales (solo hoy y si falta bastante).
@@ -1145,6 +1244,7 @@ function racha(diarios, hoy) {
     let html = '';
     if (H.modo === 'lista') {
       html = `<div class="hoja alta">${cabH('Añadir a la ' + nombreComida(H.m).toLowerCase())}${chipsComida(H.m)}
+        ${conFotos() ? `<label class="btn sec ancho fotoBtn">${ico('foto', 20)} Foto del plato<input type="file" id="fotoInput" accept="image/*" class="oculto"></label>` : ''}
         <form class="rapido" data-form="buscar"><input id="buscar" type="search" enterkeyhint="search" placeholder="Busca: «pollo», «skyr», «avena»…" aria-label="Buscar alimento" value="${esc(H.busca || '')}" autocomplete="off"><button type="button" data-act="escanear" aria-label="Escanear código de barras">${ico('codigo', 18)}</button></form>
         <div id="resultados" class="grupo" style="gap:16px">${resultados()}</div></div>`;
     } else if (H.modo === 'racion') {
@@ -1207,6 +1307,43 @@ function racha(diarios, hoy) {
         <p class="nota">No he podido copiarlo solo. Mantén pulsado el texto → Seleccionar todo → Copiar, y pégalo en un script nuevo de Scriptable.</p>
         <textarea class="campo" id="codigoWidget" readonly style="height:220px;padding:12px;font:12px/1.4 ui-monospace,monospace;resize:none">${esc(codigoWidget())}</textarea>
         <button class="btn sec ancho" data-act="cerrar">Cerrar</button></div>`;
+    } else if (H.modo === 'fotoNueva') {
+      html = `<form class="hoja" data-form="fotoNueva">${cabH('Foto del plato')}
+        <img class="fotoGrande" src="${esc(H.foto)}" alt="Tu plato">
+        <label class="camp"><span>¿Algo que no se vea? (opcional)</span><textarea class="campo" id="fotoNota" rows="2" placeholder="«200 g de arroz», «frito con aceite», «la salsa es nata»…">${esc(H.nota || '')}</textarea></label>
+        <span class="eti">¿En qué comida?</span>${chipsComida(H.m)}
+        <p class="nota">Claude la lee en tu PC (mira cada 30 min) y te deja los ingredientes con sus gramos para que los revises. Un tenedor o tu mano al lado le ayudan a calcular la cantidad.</p>
+        <div class="fila"><button class="btn" style="flex:1">Enviar</button><button type="button" class="btn sec" data-act="volver">Volver</button></div></form>`;
+    } else if (H.modo === 'foto') {
+      const f = D.fotos.find(x => x.id === H.id);
+      if (!f) return cerrarHoja();
+      const r = f.resultado || {};
+      const cab = `<div class="fotoCab">${f.mini ? `<img class="fotoMini" src="${esc(f.mini)}" alt="">` : ''}<p>${f.nota ? 'Tu nota: «' + esc(f.nota) + '»' : 'Sin nota'}</p></div>`;
+      if (f.estado === 'leida') {
+        const tot = suma(itemsFoto(H).map(([a, g]) => macros(a, g)));
+        html = `<form class="hoja alta" data-form="foto">${cabH(r.plato || 'Tu plato')}${cab}
+          ${r.comentario ? `<p class="nota">${esc(r.comentario)}</p>` : ''}
+          <span class="eti">Ingredientes · confianza ${esc(r.confianza || 'media')}</span>
+          <div class="lista">${H.items.map((x, i) => x.quitado ? '' : `<div class="ing"><div class="txt"><b>${esc(x.a.nombre)}</b><small id="fk${i}">${n0(macros(x.a, x.g).kcal)} kcal · P ${n1(macros(x.a, x.g).prot)}</small></div>
+            <label><input id="fg${i}" inputmode="numeric" value="${x.g || ''}" aria-label="Gramos de ${esc(x.a.nombre)}" autocomplete="off"><span>g</span></label>
+            <button type="button" class="quitar" data-act="quitarIng" data-i="${i}" aria-label="Quitar ${esc(x.a.nombre)}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>`).join('')}</div>
+          <div class="total" id="totalFoto">${totalHtml(tot)}</div>
+          <p class="nota">Es una estimación: corrige los gramos si sabes lo que hay. Lo que más se escapa es el aceite y las salsas.</p>
+          <span class="eti">¿En qué comida?</span>${chipsComida(H.m)}
+          <button class="btn ancho">Añadir a la ${nombreComida(H.m).toLowerCase()}</button>
+          <button type="button" class="btn peligro" data-act="quitarFoto">Descartar foto</button></form>`;
+      } else if (f.estado === 'ilegible') {
+        html = `<form class="hoja" data-form="releer">${cabH('No se ve bien')}${cab}
+          <p class="nota">${esc(r.comentario || 'Claude no ha podido saber qué hay en el plato.')} Escribe qué es y lo vuelve a leer en la próxima pasada.</p>
+          <textarea class="campo" id="releerNota" rows="2" placeholder="«Lentejas con chorizo, un plato hondo»">${esc(f.nota || '')}</textarea>
+          <div class="fila"><button class="btn" style="flex:1">Volver a leer</button><button type="button" class="btn sec" data-act="cerrar">Cerrar</button></div>
+          <button type="button" class="btn peligro" data-act="quitarFoto">Descartar foto</button></form>`;
+      } else {
+        html = `<div class="hoja">${cabH('Por leer')}${cab}
+          <p class="nota">${esc(estadoFoto(f)[1])}. Cuando Claude la lea, aquí verás los ingredientes.${D.pcVisto ? ' El PC miró por última vez ' + hace(D.pcVisto) + '.' : ''}</p>
+          <button type="button" class="btn sec ancho" data-act="cerrar">Cerrar</button>
+          <button type="button" class="btn peligro" data-act="quitarFoto">Descartar foto</button></div>`;
+      }
     } else if (H.modo === 'perfil') {
       html = `<div class="hoja alta">${cabH('Tus datos')}${formPerfil('Guardar y recalcular')}<button class="btn sec ancho" data-act="cerrar">Cancelar</button></div>`;
     } else if (H.modo === 'metaMano') {
@@ -1295,7 +1432,7 @@ function racha(diarios, hoy) {
   setTimeout(() => detector().catch(() => {}), 2500);
 
   // Versión de la app: si en GitHub hay una más nueva que la que guardó el iPhone, se recarga sola.
-  const VERSION = '2026-11-09b';
+  const VERSION = '2026-11-11a';
   if (/github\.io$/.test(location.hostname)) setTimeout(async () => {
     try {
       const t = await (await fetch(location.pathname + '?comprobar=' + Date.now(), { cache: 'no-store' })).text();
@@ -1537,6 +1674,19 @@ function racha(diarios, hoy) {
       enviar('plato', { id: nid('p'), nombre: r.n, items: escalar(r, kcalComida(hoja.m)).map(([a, g]) => [a.id, g]) });
       avisar('Guardado en tus platos: lo tienes arriba al pulsar +');
     },
+    verFoto: t => {
+      const f = D.fotos.find(x => x.id === t.dataset.id);
+      if (!f) return;
+      const items = f.estado === 'leida' && f.resultado ? f.resultado.items.map(x => ({ a: deFoto(x), g: Math.round(x.gramos) })) : [];
+      abrirHoja({ modo: 'foto', id: f.id, m: COMIDAS.some(c => c[0] === f.comida) ? f.comida : siguienteComida(), items });
+    },
+    quitarIng: t => { hoja.items[+t.dataset.i].quitado = true; hoja.items[+t.dataset.i].g = 0; pintarHoja(); },
+    quitarFoto: t => {
+      if (!seguro(t)) return;
+      enviar('quitarFoto', { id: hoja.id });
+      cerrarHoja();
+      avisar('Foto descartada');
+    },
     agua: t => enviar('diario', { dia: D.dia, agua: Math.max(0, D.diario.agua + Number(t.dataset.ml)) }),
     creatina: () => {
       const si = !D.diario.creatina;
@@ -1624,10 +1774,20 @@ function racha(diarios, hoy) {
     const id = e.target.id;
     if (id === 'buscar') { hoja.busca = e.target.value; $('resultados').innerHTML = resultados(); }
     if (id === 'gramos') { hoja.g = leerG() || 0; $('total').innerHTML = totalHtml(macros(hoja.a, hoja.g)); }
+    if (/^fg\d+$/.test(id) && hoja && hoja.modo === 'foto') {
+      const i = +id.slice(2), x = hoja.items[i];
+      x.g = Math.max(0, Math.round(parseFloat(String(e.target.value).replace(',', '.')) || 0));
+      const m = macros(x.a, x.g);
+      $('fk' + i).textContent = n0(m.kcal) + ' kcal · P ' + n1(m.prot);
+      $('totalFoto').innerHTML = totalHtml(suma(itemsFoto(hoja).map(([a, g]) => macros(a, g))));
+    }
+    if (id === 'fotoNota' && hoja) hoja.nota = e.target.value;
     if (id === 'filtro') { const q = sinAcentos(e.target.value.trim()); document.querySelectorAll('#listaFoods .ali').forEach(r => { r.hidden = !r.dataset.nombre.includes(q); }); }
     if (/^pf/.test(id)) pintarResumenPerfil();
     if (/^mm/.test(id)) totalMetaMano();
   });
+
+  document.addEventListener('change', e => { if (e.target.id === 'fotoInput') elegirFoto(e.target); });
 
   document.addEventListener('submit', e => {
     e.preventDefault();
@@ -1645,6 +1805,26 @@ function racha(diarios, hoy) {
       apuntar([[hoja.a, g]], hoja.m, 'Añadido: ' + que(hoja.a, g));
     }
     if (f === 'codigo') porCodigo($('codigoMano').value);
+    if (f === 'fotoNueva') {
+      const d = { id: nid('f'), dia: D.dia, comida: hoja.m, foto: hoja.foto, mini: hoja.mini, nota: $('fotoNota').value.trim().slice(0, 200) };
+      enviar('foto', d);
+      cerrarHoja();
+      if (vista !== 'today') { vista = 'today'; guardarVista(); pintar(); }
+      avisar('Foto enviada: Claude la leerá cuando tu PC mire');
+    }
+    if (f === 'foto') {
+      const items = itemsFoto(hoja);
+      if (!items.length) return avisar('No queda ningún ingrediente con gramos');
+      const fo = D.fotos.find(x => x.id === hoja.id);
+      const id = hoja.id;
+      apuntar(items, hoja.m, `Añadido «${(fo && fo.resultado && fo.resultado.plato) || 'tu plato'}»`);
+      enviar('quitarFoto', { id });
+    }
+    if (f === 'releer') {
+      enviar('releerFoto', { id: hoja.id, nota: $('releerNota').value.trim().slice(0, 200) });
+      cerrarHoja();
+      avisar('La vuelvo a leer en la próxima pasada');
+    }
     if (f === 'receta') {
       const r = RECETAS.find(x => x.id === hoja.r);
       apuntar(escalar(r, kcalComida(hoja.m)), hoja.m, `Añadido «${r.n}»`);
